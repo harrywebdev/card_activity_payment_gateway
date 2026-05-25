@@ -1,19 +1,8 @@
-import { redirect } from "next/navigation";
-import { issueMagicLink } from "@/lib/magic-link";
 import { BRAND_NAME } from "@/lib/config";
 
 export const metadata = {
   title: `Přihlášení | ${BRAND_NAME}`,
 };
-
-async function requestMagicLink(formData: FormData) {
-  "use server";
-  const email = formData.get("email")?.toString() ?? "";
-  await issueMagicLink(email);
-  // Silent-success behaviour — same redirect whether or not the email
-  // is on the allowlist.
-  redirect("/login?sent=1");
-}
 
 export default async function LoginPage({
   searchParams,
@@ -47,7 +36,7 @@ export default async function LoginPage({
           </div>
         )}
 
-        <form action={requestMagicLink} className="space-y-3">
+        <form action="/api/auth/request-link" method="post" className="space-y-3">
           <label htmlFor="email" className="sr-only">
             E-mail
           </label>

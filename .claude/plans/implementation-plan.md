@@ -116,13 +116,21 @@ Three Czech bank cards (CSOB, AirBank, Raiffeisen) require 5-10 transactions per
 
 ## Components
 
-### 1. Next.js Web App (`app/`, `components/`, `lib/`)
+### 1. Next.js Web App (`src/app/`, `src/components/`, `src/lib/`)
 
-App Router with Server Components by default, Server Actions for mutations. Tailwind + shadcn/ui for the design system. Drizzle/SQLite access lives in `src/db` and is imported directly from server components and route handlers.
+App Router with Server Components by default. **No Server Actions** — every mutation goes through an explicit `app/api/*/route.ts` POST handler with `<form action="/api/..." method="post">` for progressive enhancement. The rationale:
+
+- Smaller, explicit surface (every mutation has a known URL; greppable + curl-testable).
+- Avoids the action-ID enumeration, action-closure-encryption (e.g. CVE-2024-46982 class), and related concerns that come bundled with `"use server"`.
+- Consistent with typo_edita's pattern — every mutation in that codebase is a route handler.
+
+Tailwind v4 + shadcn/ui (CSS-variable mode, no `tailwind.config.ts`). Prisma/SQLite access lives in `src/lib/db.ts` and is imported directly from server components and route handlers.
 
 Key flows:
-- **Login**: form posts email → Server Action creates token row → Resend sends link → `/auth/verify?token=…` route consumes token, sets session cookie.
-- **Subscribe**: form on `/subscribe/[hex]` → Server Action creates a pending `subscription` + `payment_method` (if user has none) → calls `gopay.createPayment({recurrence: ON_DEMAND, amount: instalment_amount, target: subscription_metadata})` → redirects user to GoPay's hosted URL.
+- **Login**: form posts to `/api/auth/request-link` → handler reads FormData, calls `issueMagicLink(email)` (allowlist check inside the lib so it silently no-ops for non-allowlisted addresses), redirects to `/login?sent=1`. UX response is identical whether or not the email is recognised, so the form can't be used for enumeration.
+- **Verify**: `/api/auth/verify?token=…` consumes the token (single-use + expiry), find-or-creates the User with a CVCVC username on first verification, sets the iron-session cookie, redirects to `/dashboard`.
+- **Logout**: `/api/auth/logout` (POST) destroys the session, redirects to `/`.
+- **Subscribe**: form on `/subscribe/[hex]` → posts to `/api/subscriptions/create` → handler creates a pending `Subscription` + `PaymentMethod` (if user has none) → calls `gopay.createPayment({recurrence: ON_DEMAND, amount: instalment_amount, target: subscription_metadata})` → redirects user to GoPay's hosted URL.
 - **GoPay callback** (`/api/gopay/callback`): user-facing redirect after 3DS. Reads payment status, shows success/failure page, but does **not** trust this for state changes.
 - **GoPay notify** (`/api/gopay/notify`): server-to-server webhook from GoPay. Verifies signature, marks subscription active + payment_method saved + first transaction recorded, triggers planner to fill the rest of the current month.
 
