@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAuthorizedCron, recordHeartbeat } from "@/lib/cron";
 import { planSubscriptionForMonth } from "@/lib/planner";
+import { sendTelegram } from "@/lib/telegram";
+import { tplPlannerError } from "@/lib/telegram-templates";
 
 /**
  * POST /api/cron/plan-month
@@ -51,6 +53,11 @@ export async function POST(req: Request) {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await recordHeartbeat("planner", "error", message).catch(() => {});
+    try {
+      await sendTelegram(tplPlannerError(message));
+    } catch (telegramErr) {
+      console.error("Telegram planner-error alert failed:", telegramErr);
+    }
     return NextResponse.json({ error: "planner_failed", message }, { status: 500 });
   }
 }

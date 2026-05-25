@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getPaymentStatus } from "@/lib/gopay";
 import { planSubscriptionForMonth, splitAmount } from "@/lib/planner";
 import { sendTelegram } from "@/lib/telegram";
+import { tplActivation } from "@/lib/telegram-templates";
 
 /**
  * GoPay server-to-server notification.
@@ -156,9 +157,13 @@ async function handleInitialEnrolmentNotification(
 
   try {
     await sendTelegram(
-      `🎨 Nové předplatné: <b>${subscription.color.name}</b> (${subscription.color.hex}) — ` +
-        `${subscription.user.username}, ${subscription.monthlyAmountCzk} CZK/měs ` +
-        `v ${subscription.instalmentsPerMonth} splátkách. První splátka ${firstAmount} CZK proběhla.`,
+      tplActivation({
+        color: subscription.color,
+        username: subscription.user.username,
+        monthlyAmountCzk: subscription.monthlyAmountCzk,
+        instalmentsPerMonth: subscription.instalmentsPerMonth,
+        firstAmountCzk: firstAmount,
+      }),
     );
   } catch (e) {
     console.error("Telegram notify failed (non-fatal):", e);

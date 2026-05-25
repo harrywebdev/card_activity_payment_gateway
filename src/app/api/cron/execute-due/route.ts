@@ -4,6 +4,11 @@ import { isAuthorizedCron, recordHeartbeat } from "@/lib/cron";
 import { createRecurrence } from "@/lib/gopay";
 import { EXECUTOR } from "@/lib/config";
 import { sendTelegram } from "@/lib/telegram";
+import {
+  tplInstalmentSuccess,
+  tplInstalmentFailure,
+  tplExecutorError,
+} from "@/lib/telegram-templates";
 
 const BATCH_SIZE = 50;
 
@@ -114,8 +119,13 @@ export async function POST(req: Request) {
 
         try {
           await sendTelegram(
-            `💳 <b>${sub.color.name}</b> ${sub.color.hex} — ${sub.user.username}: ` +
-              `${sp.amountCzk} CZK (${sp.subscriptionPlan.completedInstalments + 1}/${sub.instalmentsPerMonth})`,
+            tplInstalmentSuccess({
+              color: sub.color,
+              username: sub.user.username,
+              amountCzk: sp.amountCzk,
+              instalmentNumber: sp.subscriptionPlan.completedInstalments + 1,
+              instalmentsPerMonth: sub.instalmentsPerMonth,
+            }),
           );
         } catch (telegramErr) {
           console.error("Telegram per-tx failed (non-fatal):", telegramErr);
@@ -147,9 +157,13 @@ export async function POST(req: Request) {
 
           try {
             await sendTelegram(
-              `🚨 Platba selhala: <b>${sub.color.name}</b> ${sub.color.hex} — ` +
-                `${sub.user.username}, ${sp.amountCzk} CZK po ${newAttempts} pokusech.\n` +
-                `<i>${errMessage}</i>`,
+              tplInstalmentFailure({
+                color: sub.color,
+                username: sub.user.username,
+                amountCzk: sp.amountCzk,
+                attempts: newAttempts,
+                error: errMessage,
+              }),
             );
           } catch (telegramErr) {
             console.error("Telegram failure alert failed:", telegramErr);
@@ -186,6 +200,11 @@ export async function POST(req: Request) {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await recordHeartbeat("executor", "error", message).catch(() => {});
+    try {
+      await sendTelegram(tplExecutorError(message));
+    } catch (telegramErr) {
+      console.error("Telegram executor-error alert failed:", telegramErr);
+    }
     return NextResponse.json(
       { error: "executor_failed", message, processed, succeeded, retried, failed },
       { status: 500 },
