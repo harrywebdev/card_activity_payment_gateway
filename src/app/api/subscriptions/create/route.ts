@@ -32,6 +32,12 @@ export async function POST(req: Request) {
   if (!Number.isFinite(instalmentsPerMonth) || instalmentsPerMonth < 1 || instalmentsPerMonth > 31) {
     back(hex, "invalid_instalments");
   }
+  // GoPay's effective minimum per charge is 1 CZK — card networks reject
+  // sub-koruna amounts in practice. The client form prevents this, but
+  // re-check on the server in case someone hand-crafts the POST.
+  if (monthlyAmountCzk < instalmentsPerMonth) {
+    back(hex, "instalment_too_small");
+  }
 
   const color = await prisma.color.findUnique({ where: { hex } });
   if (!color) redirect("/colors");

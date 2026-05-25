@@ -1,12 +1,12 @@
-# Card Activity Gateway — Implementation Plan
+# Kup si Odstín — Implementation Plan
 
 ## Context
 
-Three Czech bank cards (CSOB, AirBank, Raiffeisen) require 5-10 transactions per month each to qualify for bonuses (extra interest, etc.). The goal is to fully automate these transactions so they happen without manual effort.
+`kupsiodstin.cz` is a 16-colour subscription storefront. The user picks one of the IBM CGA shades from 1981, sets a monthly amount and an instalment count, and the colour shows them as the owner in the catalogue until they stop paying. One owner per colour at a time.
 
-**Approach:** Run our own payment gateway using **GoPay** as the processor. Each card is saved (tokenized) once with 3DS verification, then charged on a schedule using merchant-initiated transactions (MIT) — no further SCA needed. The money flows to our own merchant account, so we only lose GoPay's commission (~0.95% per tx, no fixed fee).
+**Approach:** Run our own payment gateway using **GoPay** as the processor. The user enrols their card once via GoPay's hosted page; the resulting payment id becomes a token we reuse for merchant-initiated transactions (MIT) without further customer interaction. The money flows to our own merchant account, so we only lose GoPay's commission (~0.95% per tx, no fixed fee).
 
-**Brand:** **Kup si Odstín** ("Buy yourself a Shade"). Domain: `kupsiodstin.cz`. Internal codebase name stays `card_activity_gateway` — the brand is the public surface only.
+**Brand:** **Kup si Odstín** ("Buy yourself a Shade"). Domain: `kupsiodstin.cz`.
 
 **Product framing — Color Subscriptions:** The system is wrapped in a real-looking storefront where users "claim" a color from a curated catalog by subscribing with a monthly-instalment plan. This is not decoration — it is the actual product surface. Each MIT charge is a real instalment toward a real subscription, so:
 
@@ -26,8 +26,8 @@ Three Czech bank cards (CSOB, AirBank, Raiffeisen) require 5-10 transactions per
 
 - **Catalog**: ~1000 curated named colors (seeded from the XKCD color survey or similar public-domain palette). Each color has a hex value, display name, and at most one current owner.
 - **One owner per color at a time.** Creates scarcity and makes the "claim" action feel meaningful. When a subscription is cancelled the color becomes claimable again.
-- **Subscribe flow**: logged-in user picks an unclaimed color → sets `monthly_amount_czk` (e.g. 100) and `instalments_per_month` (e.g. 10) → confirms → GoPay hosted-page payment for the first instalment (10 CZK) with `recurrence.recurrenceCycle: ON_DEMAND` → 3DS → on success: card token saved, subscription activated, planner schedules the remaining instalments for the current month.
-- **First subscription enrols the user's card.** Subsequent subscriptions on the same account reuse the saved payment method silently (no 3DS).
+- **Subscribe flow**: logged-in user picks an unclaimed color → sets `monthly_amount_czk` (e.g. 100) and `instalments_per_month` (e.g. 10, with each instalment ≥ 1 CZK — GoPay's effective minimum) → confirms → GoPay hosted-page payment for the first instalment with `recurrence.recurrenceCycle: ON_DEMAND` → on success: card token saved, subscription activated, planner schedules the remaining instalments for the current month.
+- **First subscription enrols the user's card.** Subsequent subscriptions on the same account reuse the saved payment method silently — no customer interaction required.
 - **Auto-renew**: on the 1st of each month, the planner generates a new schedule of `instalments_per_month` charges of `monthly_amount_czk / instalments_per_month` CZK for every active subscription, spread randomly across days 2-27 between 08:00-21:00.
 - **Cancel**: user-initiated from the dashboard; color is returned to the pool at end of current month.
 
@@ -131,7 +131,7 @@ Key flows:
 - **Verify**: `/api/auth/verify?token=…` consumes the token (single-use + expiry), find-or-creates the User with a CVCVC username on first verification, sets the iron-session cookie, redirects to `/dashboard`.
 - **Logout**: `/api/auth/logout` (POST) destroys the session, redirects to `/`.
 - **Subscribe**: form on `/subscribe/[hex]` → posts to `/api/subscriptions/create` → handler creates a pending `Subscription` + `PaymentMethod` (if user has none) → calls `gopay.createPayment({recurrence: ON_DEMAND, amount: instalment_amount, target: subscription_metadata})` → redirects user to GoPay's hosted URL.
-- **GoPay callback** (`/api/gopay/callback`): user-facing redirect after 3DS. Reads payment status, shows success/failure page, but does **not** trust this for state changes.
+- **GoPay callback** (`/api/gopay/callback`): user-facing redirect after the hosted-page flow. Reads payment status, shows success/failure page, but does **not** trust this for state changes.
 - **GoPay notify** (`/api/gopay/notify`): server-to-server webhook from GoPay. Verifies signature, marks subscription active + payment_method saved + first transaction recorded, triggers planner to fill the rest of the current month.
 
 ### 2. GoPay API Client (`src/gopay/`)
@@ -139,7 +139,7 @@ Key flows:
 Thin typed wrapper around GoPay's REST API:
 - `authenticate()` — OAuth2 Client Credentials grant (server-to-server). Caches bearer token until expiry. **This is for our backend talking to GoPay's API — no user involvement.**
 - `createPayment(params)` — initial enrolment payment. Sends `recurrence.recurrenceCycle: ON_DEMAND` so the resulting payment ID can be reused as a token. Returns the payment object including `gw_url` (the hosted payment page).
-- `createRecurrence(originalPaymentId, amount, orderMeta)` — MIT charge for subsequent instalments. Pure server-to-server, no 3DS.
+- `createRecurrence(originalPaymentId, amount, orderMeta)` — MIT charge for subsequent instalments. Pure server-to-server, no customer interaction.
 - `getPaymentStatus(paymentId)` — verification on callbacks and webhook. We always re-fetch via the API instead of trusting the webhook payload at face value.
 - `voidRecurrence(paymentId)` — cancel ON_DEMAND token when a subscription is cancelled.
 
@@ -170,7 +170,7 @@ Browser              kupsiodstin.cz (Next.js)         GoPay API           GoPay 
    │ ◄ 307 → gw_url ───────── │                         │                          │
    │ ─────────────────────────────────────────────────────────────────────────────►│
    │                          │                         │           [enter card,   │
-   │                          │                         │            3DS verify]   │
+   │                          │                         │          enter card]     │
    │                          │                         │ ◄──── webhook ────────── │
    │                          │ ◄ POST notification_url │                          │
    │                          │  verify signature       │                          │
@@ -202,7 +202,7 @@ Disco cron (*/10 min) ─► execute-due.js
                             ▼
                          createRecurrence(originalPaymentId, amount, orderMeta)
                             │
-                            │  GoPay charges saved token, no 3DS,
+                            │  GoPay charges saved token (no customer prompt),
                             │  returns new payment id + status
                             ▼
                          record transactions row,
@@ -226,7 +226,7 @@ Disco cron (*/10 min) ─► execute-due.js
 #### Still to verify on first live sandbox run
 
 - **Contact-email constraints**: whether mismatch between `payer.contact.email` and the actual cardholder produces an error or just a warning.
-- **MIT 3DS exemption boundaries**: confirm the `ON_DEMAND` recurrence flow does not re-trigger SCA after the initial enrolment, including under PSD2 step-up rules (large amounts, unusual patterns).
+- **Recurrence step-up boundaries**: confirm the `ON_DEMAND` flow doesn't re-prompt the customer after the initial enrolment, even under PSD2 step-up rules (large amounts, unusual patterns).
 
 ### 3. Scheduler (Disco cron → shell script → API route)
 
@@ -374,7 +374,7 @@ Card/payment-method details live in the DB after enrollment, never in config.
 ## Project Structure
 
 ```
-card_activity_payment_gateway/
+kupsiodstin/
 ├── prisma/
 │   ├── schema.prisma             # all models, datasource sqlite
 │   └── migrations/               # generated by prisma migrate dev
@@ -612,11 +612,11 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 
 1. **Unit tests**: planner distribution (correct count, spread, within window), instalment-amount rounding (sum equals `monthly_amount_czk`).
 2. **Auth tests**: magic-link token single-use, expiry enforcement, session cookie validation, allowlist behaviour (allowed email gets a token + email, non-allowlisted email gets the same UI response but no token row and no email send), username generation produces a unique 5-letter string and is stable across subsequent logins for the same email.
-3. **GoPay sandbox**: full subscribe → 3DS → callback → first transaction → MIT recurrence on day N.
+3. **GoPay sandbox**: full subscribe → hosted-page payment → callback → first transaction → MIT recurrence on day N.
 4. **Dry-run mode**: full cycle with `dryRun: true` — scheduler plans, executor runs but skips actual GoPay calls, Telegram + Resend emails fire (to a sink address).
 5. **Healthcheck drills**: stop the Disco executor job, confirm `/healthz` flips to 503 within `executorStaleMinutes`; restart, confirm recovery.
 6. **Integration test**: enroll 1 real card via the live subscribe flow, let scheduler charge it a few times across 2-3 days, verify on bank statement.
-7. **Full rollout**: subscribe all 3 cards to 3 colors, monitor first full month, validate bank-bonus eligibility hit.
+7. **Full rollout**: subscribe a real card to a real colour, let the planner+executor run for a month, sanity-check the GoPay merchant dashboard against `Transaction` rows.
 
 ---
 

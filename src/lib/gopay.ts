@@ -13,6 +13,9 @@ import { env } from "@/lib/config";
  *   production https://gate.gopay.cz/api
  * - OAuth2 Client Credentials grant, scope "payment-all", Basic auth header.
  * - Amounts are in haléř (1/100 CZK). We convert at this module's boundary.
+ * - Effective per-charge minimum is 1 CZK (100 haléř); GoPay's docs don't
+ *   pin an explicit floor for card payments but card networks reject
+ *   sub-koruna amounts in practice.
  * - Webhooks are unsigned by GoPay design — the contract is "we send you
  *   the payment id, you call getStatus to confirm". Handled by the route.
  *

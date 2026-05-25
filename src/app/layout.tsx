@@ -37,7 +37,7 @@ export default function RootLayout({
                 className="center"
                 style={{ color: "var(--c8)", fontSize: 18 }}
               >
-                ─ ─ ─ KupSiOdstin.cz · (C) 2026 · Powered by IBM PC compatible & Otto Bohuš vibes ─ ─ ─
+                ─ ─ ─ KupSiOdstin.cz · (C) 2026 ─ ─ ─
               </div>
             </div>
           </div>

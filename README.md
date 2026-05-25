@@ -1,46 +1,36 @@
 # Kup si Odstín
 
-Self-hosted payment gateway that automates the minimum card transactions required to qualify for Czech bank bonuses (extra interest, cashback, etc.). Wrapped in a real storefront — `kupsiodstin.cz` — where users claim a color from a curated catalogue via a monthly-instalment subscription.
+`kupsiodstin.cz` — a 16-colour subscription storefront. Pick one of the IBM CGA shades from 1981, set what you want to pay per month and over how many instalments, and the colour is yours on the catalogue until you stop paying. One owner per colour at a time.
 
-Internal codebase name: `card_activity_gateway`. Public brand: **Kup si Odstín**.
+## How it works
 
-## Problem
-
-Several Czech banks (CSOB, AirBank, Raiffeisen) offer bonus perks on debit/credit cards — but only if you make a minimum number of transactions per month (typically 5-10). Doing this manually is tedious and easy to forget.
-
-## Solution
-
-A payment gateway charging your own cards on a schedule. The money goes to your own merchant account, so you only lose the payment processor's commission. To make the charging pattern look natural to anyone auditing the merchant (cards on file with realistic order metadata; instalment-shaped recurring micro-charges), it's framed as a real product: subscribe to "own" a color from the catalogue, paid off in monthly instalments. Each MIT charge is a genuine instalment toward a genuine (if niche) subscription.
-
-**How it works:**
-
-1. **Sign in with magic link** (allowlisted emails only). On first login you're assigned a pseudo-Czech 5-letter username (e.g. `karpa`) — your public identity on color owner pages.
-2. **Claim a color** — pick an unclaimed hex from the catalogue, choose `monthly_amount_czk` and `instalments_per_month` (e.g. 100 CZK / month in 10 instalments). One owner per color.
-3. **One-time card enrolment** — the first instalment runs through GoPay's hosted page with `ON_DEMAND` recurrence + 3DS. Card token saved.
-4. **Automatic scheduling** — on the 1st of each month, the planner generates a randomized schedule of charges across days 2-27, between 08:00-21:00, for every active subscription.
-5. **Charges run unattended** — Disco's scheduler triggers the executor every 10 min; merchant-initiated transactions hit GoPay against saved tokens. No further 3DS/SCA after enrolment.
-6. **Telegram notifications** — per-transaction confirmations, daily progress summaries, monthly recap, error alerts.
+1. **Sign in with a magic link** (allowlisted emails only). On first sign-in you're assigned a unique 5-letter username (e.g. `karpa`) — that's your public identity on colour owner pages.
+2. **Pick a free colour** from the 16-colour CGA palette. Each colour has one owner at a time.
+3. **Set the terms** — pick `monthlyAmountCzk` (what you want to pay each month) and `instalmentsPerMonth` (how many separate charges to split it into; each instalment must be at least 1 CZK).
+4. **First payment goes through GoPay's hosted page.** Card details stay with GoPay; we never see them.
+5. **The rest of the month runs unattended.** Disco's scheduler triggers our executor every 10 minutes, which charges saved card tokens for any instalments that are due.
+6. **Telegram notifications** for per-instalment confirmations, daily progress digests, monthly recaps, and error alerts.
 
 ## Why GoPay
 
-Comparison for micro-transactions in CZK:
+For micro-transactions in CZK:
 
-| Processor | Per-tx fee | Monthly fee | Cost on 20 CZK tx |
-|-----------|-----------|-------------|-------------------|
+| Processor | Per-tx fee | Monthly fee | Cost on a 20 CZK charge |
+|-----------|-----------|-------------|-------------------------|
 | Stripe | 1.5% + 6.50 CZK | 0 CZK | 6.80 CZK (34%) |
 | Comgate | 1% + 0 CZK | 100 CZK | 0.20 CZK (1%) |
 | **GoPay** | **0.95% + 0 CZK** | **80 CZK** | **0.19 CZK (0.95%)** |
 
-GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest percentage rate, ON_DEMAND recurring payment support, and 12 months free on the Start plan.
+GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest percentage rate, ON_DEMAND recurring payment support, 12 months free on the Start plan.
 
 ## Tech Stack
 
-- **TypeScript / Next.js 16** (App Router, server components, server actions)
-- **Tailwind CSS v4 + shadcn/ui** — design system
+- **TypeScript / Next.js 16** (App Router, server components)
+- **Tailwind CSS v4** + a custom MS-DOS textmode design (CGA 16 palette, VT323 + IBM Plex Mono)
 - **iron-session** — stateless encrypted-cookie auth, no sessions table
 - **Resend** — magic-link emails
-- **GoPay** — payment processing (REST API, OAuth2, ON_DEMAND recurrence)
-- **SQLite** via Prisma 7 + `@prisma/adapter-better-sqlite3`; migrations via `prisma migrate deploy` in a dedicated migrator container on every deploy
+- **GoPay** — payment processing (REST API, OAuth2, ON_DEMAND recurrence, merchant-initiated transactions)
+- **SQLite** via Prisma 7 + `@prisma/adapter-better-sqlite3`; migrations run via `prisma migrate deploy` in a dedicated migrator container on every deploy
 - **Disco.cloud** — Docker deployment with two images (main + migrator) and native cron scheduler
 - **Telegram Bot API** — notifications + deploy pings
 
@@ -111,5 +101,4 @@ What `disco.json` declares:
 - [ ] `GOPAY_SANDBOX=false`
 - [ ] Telegram chat is the right one and `@<your bot> /start` has been issued so it can DM you
 - [ ] Resend domain is verified (otherwise magic-link emails won't land)
-- [ ] Bank cards enrolled with the correct `monthlyAmountCzk` / `instalmentsPerMonth` per bank's bonus criteria
 - [ ] `/api/healthz` is being polled by an external uptime monitor
