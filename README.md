@@ -35,14 +35,14 @@ GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest pe
 
 ## Tech Stack
 
-- **TypeScript / Next.js 15** (App Router, server components, server actions)
-- **Tailwind CSS + shadcn/ui** — design system
+- **TypeScript / Next.js 16** (App Router, server components, server actions)
+- **Tailwind CSS v4 + shadcn/ui** — design system
 - **iron-session** — stateless encrypted-cookie auth, no sessions table
 - **Resend** — magic-link emails
 - **GoPay** — payment processing (REST API, OAuth2, ON_DEMAND recurrence)
-- **SQLite** via Drizzle ORM (WAL mode for safe multi-process access)
-- **Disco.cloud** — Docker deployment + native cron scheduler
-- **Telegram Bot API** — notifications
+- **SQLite** via Prisma 7 + `@prisma/adapter-better-sqlite3`; migrations via `prisma migrate deploy` in a dedicated migrator container on every deploy
+- **Disco.cloud** — Docker deployment with two images (main + migrator) and native cron scheduler
+- **Telegram Bot API** — notifications + deploy pings
 
 ## Setup
 
@@ -59,12 +59,17 @@ See [.env.example](.env.example) for the full list of required environment varia
 
 ## Deployment
 
-Single multi-stage Dockerfile. On Disco.cloud:
+Two Dockerfiles (`Dockerfile` for the Next.js standalone build, `Dockerfile.migrator` for a minimal image used by deploy hooks). On Disco.cloud:
 
-- One long-running **web service** (Next.js standalone, port 3000, `/data` volume).
-- Three Disco **scheduled jobs** invoking the same image with overridden command:
-  - `*/10 * * * *` → `node dist/cli/execute-due.js` (process due payments)
-  - `0 0 1 * *` → `node dist/cli/plan-month.js` (generate next month's schedule)
-  - `0 21 * * *` → `node dist/cli/daily-summary.js` (Telegram digest)
+- **web** — long-running Next.js standalone, port 3000, `db-data` volume mounted at `/app/data`.
+- **Deploy hooks** (one-shot, migrator image):
+  - `hook:deploy:start:before` → `prisma migrate deploy` (aborts the deploy on failure).
+  - `hook:deploy:start:after` → wget to Telegram with deploy status.
+- **Cron services** (`"type": "cron"`, default image, no DB volume — they only `wget` the web service):
+  - `*/10 * * * *` → `scripts/cron-execute-due.sh` → `POST /api/cron/execute-due`
+  - `0 0 1 * *` → `scripts/cron-plan-month.sh` → `POST /api/cron/plan-month`
+  - `0 21 * * *` → `scripts/cron-daily-summary.sh` → `POST /api/cron/daily-summary`
 
-Uptime monitoring: point UptimeRobot / Better Stack at `/healthz` — it reads the heartbeat table and only returns 200 if the executor cron has fired within the last 25 minutes, so cron failures page you.
+Each cron script `wget`s the matching API route on the internal `http://web:3000` hostname with `Authorization: Bearer $CRON_SECRET`. The route does the real work — sharing the same Prisma client and `src/lib/*` modules as the rest of the app — and updates the `SystemHeartbeat` table.
+
+Uptime monitoring: point UptimeRobot / Better Stack at `/api/healthz` — it reads the heartbeat table and only returns 200 if the executor cron has fired within the last 25 minutes, so any failure in the Disco-fires → script → wget → route → DB-write chain pages you.

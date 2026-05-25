@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Identity ────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  createdAt DateTime @default(now())
+  isAdmin   Boolean  @default(false)
+
+  paymentMethods PaymentMethod[]
+  subscriptions  Subscription[]
+}
+
+model MagicLinkToken {
+  token     String    @id
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}
+
+// ─── Catalogue ───────────────────────────────────────────────────────────────
+
+model Color {
+  id   String @id @default(cuid())
+  hex  String @unique
+  name String
+
+  currentSubscriptionId String?       @unique
+  currentSubscription   Subscription? @relation("CurrentOwner", fields: [currentSubscriptionId], references: [id])
+
+  subscriptions Subscription[] @relation("ColorSubscriptions")
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+
+model PaymentMethod {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  gopayPaymentId  String   @unique
+  lastFour        String?
+  bankName        String?
+  status          String   @default("active") // active | revoked
+  createdAt       DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id])
+  colorId               String
+  color                 Color     @relation("ColorSubscriptions", fields: [colorId], references: [id])
+  paymentMethodId       String?
+  paymentMethod         PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  monthlyAmountCzk      Int
+  instalmentsPerMonth   Int
+  status                String    @default("pending") // pending | active | cancelled
+  startedAt             DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime  @default(now())
+
+  // Back-relation for Color.currentSubscription (one color → one current sub)
+  currentOnColor Color? @relation("CurrentOwner")
+
+  plans SubscriptionPlan[]
+
+  @@index([userId])
+  @@index([colorId])
+  @@index([status])
+}
+
+model SubscriptionPlan {
+  id                   String   @id @default(cuid())
+  subscriptionId       String
+  subscription         Subscription @relation(fields: [subscriptionId], references: [id])
+  year                 Int
+  month                Int
+  targetInstalments    Int
+  completedInstalments Int      @default(0)
+  status               String   @default("active") // active | completed | failed
+  createdAt            DateTime @default(now())
+
+  scheduledPayments ScheduledPayment[]
+
+  @@unique([subscriptionId, year, month])
+  @@index([year, month])
+}
+
+model ScheduledPayment {
+  id                   String   @id @default(cuid())
+  subscriptionPlanId   String
+  subscriptionPlan     SubscriptionPlan @relation(fields: [subscriptionPlanId], references: [id])
+  amountCzk            Int
+  scheduledAt          DateTime
+  status               String   @default("pending") // pending | in_progress | succeeded | failed
+  attempts             Int      @default(0)
+  lastError            String?
+
+  transactions Transaction[]
+
+  @@index([scheduledAt, status])
+}
+
+model Transaction {
+  id                  String   @id @default(cuid())
+  scheduledPaymentId  String
+  scheduledPayment    ScheduledPayment @relation(fields: [scheduledPaymentId], references: [id])
+  amountCzk           Int
+  status              String   // succeeded | failed
+  gopayPaymentId      String?
+  error               String?
+  executedAt          DateTime @default(now())
+
+  @@index([scheduledPaymentId])
+}
+
+// ─── Ops ─────────────────────────────────────────────────────────────────────
+
+model SystemHeartbeat {
+  jobName     String   @id
+  lastRunAt   DateTime
+  lastStatus  String   // ok | error
+  lastMessage String?
+}

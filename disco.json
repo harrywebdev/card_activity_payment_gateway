@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "services": {
+    "hook:deploy:start:before": {
+      "type": "command",
+      "image": "migrator",
+      "command": "./node_modules/.bin/prisma migrate deploy",
+      "volumes": [
+        {
+          "name": "db-data",
+          "destinationPath": "/app/data"
+        }
+      ]
+    },
+    "hook:deploy:start:after": {
+      "type": "command",
+      "image": "migrator",
+      "command": "sh -c 'wget -qO- --post-data=\"chat_id=${TELEGRAM_CHAT_ID}&parse_mode=Markdown&text=✅ Deploy %23${DISCO_DEPLOYMENT_NUMBER} to *${DISCO_PROJECT_NAME}* succeeded (${DISCO_COMMIT})\" \"https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage\" || true'"
+    },
+    "web": {
+      "port": 3000,
+      "volumes": [
+        {
+          "name": "db-data",
+          "destinationPath": "/app/data"
+        }
+      ]
+    },
+    "executor": {
+      "type": "cron",
+      "schedule": "*/10 * * * *",
+      "command": "./scripts/cron-execute-due.sh"
+    },
+    "planner": {
+      "type": "cron",
+      "schedule": "0 0 1 * *",
+      "command": "./scripts/cron-plan-month.sh"
+    },
+    "daily-summary": {
+      "type": "cron",
+      "schedule": "0 21 * * *",
+      "command": "./scripts/cron-daily-summary.sh"
+    }
+  },
+  "images": {
+    "default": {
+      "dockerfile": "Dockerfile"
+    },
+    "migrator": {
+      "dockerfile": "Dockerfile.migrator"
+    }
+  }
+}

@@ -67,36 +67,50 @@ Three Czech bank cards (CSOB, AirBank, Raiffeisen) require 5-10 transactions per
 ## Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    Disco.cloud                            │
-│                                                            │
-│  ┌──────────────────────┐    ┌──────────────────────┐    │
-│  │  Web service          │    │  Scheduled jobs       │    │
-│  │  (long-running)       │    │  (one-shot, same      │    │
-│  │  Next.js App Router   │    │   image, overridden   │    │
-│  │  - storefront         │    │   CMD)                │    │
-│  │  - auth (magic link)  │    │  - execute-due        │    │
-│  │  - dashboard          │    │    (*/10 * * * *)     │    │
-│  │  - GoPay callbacks    │    │  - plan-month         │    │
-│  │  - /healthz           │    │    (0 0 1 * *)        │    │
-│  └──────────┬───────────┘    │  - daily-summary      │    │
-│             │                 │    (0 21 * * *)       │    │
-│             │                 └──────────┬───────────┘    │
-│             │                            │                 │
-│             └────────────┬───────────────┘                 │
-│                          │                                  │
-│                ┌─────────┴─────────┐                       │
-│                │   /data volume     │                       │
-│                │   SQLite (WAL)     │                       │
-│                └────────────────────┘                       │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                            Disco.cloud                              │
+│                                                                      │
+│  ┌────────────────────────┐    ┌──────────────────────────────┐    │
+│  │  web (long-running)     │    │  Disco-scheduled cron jobs    │    │
+│  │  image: default         │    │  image: default               │    │
+│  │  Next.js standalone     │    │                               │    │
+│  │  - storefront           │◄───┤  execute-due  */10 * * * *    │    │
+│  │  - auth (magic link)    │    │  plan-month   0 0 1 * *       │    │
+│  │  - dashboard            │    │  daily-sum    0 21 * * *      │    │
+│  │  - GoPay callbacks      │    │                               │    │
+│  │  - /api/cron/*          │    │  Each cron service runs a     │    │
+│  │  - /api/healthz         │    │  shell script that wgets the  │    │
+│  └────────────┬───────────┘    │  matching /api/cron/* route   │    │
+│               │                 │  with Authorization: Bearer   │    │
+│               │                 │  $CRON_SECRET                  │    │
+│               │                 └──────────────────────────────┘    │
+│               │                                                       │
+│               │      ┌────────────────────────────────────┐         │
+│               │      │  Deploy hooks (one-shot)            │         │
+│               │      │  image: migrator                    │         │
+│               │      │  - hook:deploy:start:before →       │         │
+│               │      │      prisma migrate deploy          │         │
+│               │      │  - hook:deploy:start:after →        │         │
+│               │      │      wget to Telegram (deploy ping) │         │
+│               │      └────────────────┬───────────────────┘         │
+│               │                       │                              │
+│               └───────────┬───────────┘                              │
+│                           │                                          │
+│                  ┌────────┴─────────┐                                │
+│                  │ db-data volume    │                                │
+│                  │ /app/data         │                                │
+│                  │ SQLite (WAL)      │                                │
+│                  └───────────────────┘                                │
+└────────────────────────────────────────────────────────────────────┘
             │
             ▼
        GoPay API (REST + OAuth2)         Resend (magic-link email)
-       Telegram Bot API (notifications)
+       Telegram Bot API (notifications + deploy pings)
 ```
 
-`node-cron` is **not** used. Cron timing is owned by Disco's scheduler; each scheduled job is a short-lived invocation of the same image with `CMD` overridden to a CLI entry point. This keeps the web service stateless w.r.t. timing and lets the healthcheck observe cron via heartbeat rows.
+**Cron mechanism:** Disco's native `"type": "cron"` services invoke shell scripts in `scripts/cron-*.sh`. Each script does one thing: `wget` the matching `/api/cron/<name>` route on the internal `http://web:3000` hostname with `Authorization: Bearer $CRON_SECRET`. The real work — Prisma queries, GoPay calls, heartbeat writes — lives in the Next.js API route, sharing the same `src/lib/*` code as the rest of the app. No `node-cron`, no separate CLI binaries, no Prisma client duplicated across containers.
+
+**Migration mechanism:** Disco runs `prisma migrate deploy` from a minimal **migrator image** (`Dockerfile.migrator`) before every deploy via `hook:deploy:start:before`. The web image stays free of migration logic; failed migrations abort the deploy before the new web container ever starts.
 
 ---
 
@@ -195,22 +209,65 @@ Disco cron (*/10 min) ─► execute-due.js
 - **Contact-email constraints**: whether the email on `createPayment` has to match the actual cardholder, or whether mismatch just logs a warning.
 - **MIT 3DS exemption boundaries**: confirm the `ON_DEMAND` recurrence flow does not re-trigger SCA after the initial enrolment, including under PSD2 step-up rules (large amounts, unusual patterns).
 
-### 3. Scheduler (`src/scheduler/` + `src/cli/`)
+### 3. Scheduler (Disco cron → shell script → API route)
 
-- **Planner** (`planner.ts`): for each active subscription, generates `instalments_per_month` rows in `scheduled_payments` for the current month at `monthly_amount_czk / instalments_per_month` CZK each, randomly distributed across days 2-27 between 08:00-21:00 with natural spacing. Idempotent (skip if a plan already exists for that subscription + month).
-- **Executor** (`executor.ts`): picks up `scheduled_payments` rows where `scheduled_at <= now()` and `status = 'pending'`, calls `gopay.createRecurrence`, records the outcome in `transactions`, advances `subscription_plans.completed_instalments`, sends a Telegram notification. Retry policy: 3 attempts with exponential backoff (10 min, 1 h, 6 h). Writes heartbeat row on every run regardless of whether any payments were due.
-- **CLI entry points** in `src/cli/`:
-  - `execute-due.ts` — invoked by Disco every 10 min
-  - `plan-month.ts` — invoked by Disco at `0 0 1 * *`; also runs once on web-app boot as a safety net for cold starts in the middle of a month
-  - `daily-summary.ts` — invoked by Disco at `0 21 * * *`
+The scheduling logic lives in normal Next.js API routes under `app/api/cron/*`. Each route shares the same Prisma client and `src/lib/*` modules as the rest of the app, so no logic is duplicated and no separate CLI binaries are built.
 
-Each CLI entry imports config + DB, runs one pass, exits. Process lifetime measured in seconds; failures bubble up as non-zero exit code so Disco surfaces them.
+**Trigger chain:**
+
+```
+Disco cron service ──► scripts/cron-<name>.sh ──► wget http://web:3000/api/cron/<name>
+                                                  Authorization: Bearer $CRON_SECRET
+                                                       │
+                                                       ▼
+                                                  API route does the work,
+                                                  updates system_heartbeats,
+                                                  returns JSON result
+```
+
+**Cron services** (all in `disco.json` under `services`):
+
+| Service | Schedule | Script | Endpoint |
+|---|---|---|---|
+| `executor` | `*/10 * * * *` | `scripts/cron-execute-due.sh` | `POST /api/cron/execute-due` |
+| `planner` | `0 0 1 * *` | `scripts/cron-plan-month.sh` | `POST /api/cron/plan-month` |
+| `daily-summary` | `0 21 * * *` | `scripts/cron-daily-summary.sh` | `POST /api/cron/daily-summary` |
+
+**Shell script pattern** (matches typo_edita's convention; every script identical except the URL):
+
+```sh
+#!/bin/sh
+set -e
+sleep 2
+RESPONSE=$(wget -qO- --post-data= \
+  --header="Authorization: Bearer $CRON_SECRET" \
+  http://web:3000/api/cron/execute-due)
+echo "execute-due: $RESPONSE" >&2
+```
+
+`http://web:3000` resolves on Disco's internal network to the `web` service. Scripts run inside the **default image** (which has `scripts/` copied in), but they don't carry any application logic of their own — they're just authenticated HTTP triggers.
+
+**Route handlers** (all share the same auth guard + heartbeat upsert):
+
+- `POST /api/cron/plan-month` — Planner. For each active subscription, generates `instalments_per_month` rows in `scheduled_payments` for the current month at `monthly_amount_czk / instalments_per_month` CZK each, randomly distributed across days 2-27 between 08:00-21:00 with natural spacing. Idempotent (skips if a plan already exists for that subscription + month). Upserts heartbeat `planner`.
+- `POST /api/cron/execute-due` — Executor. Picks up `scheduled_payments` where `scheduled_at <= now()` and `status = 'pending'`, calls `gopay.createRecurrence`, records the outcome in `transactions`, advances `subscription_plans.completed_instalments`, sends per-tx Telegram. Retry policy: 3 attempts with exponential backoff (10 min, 1 h, 6 h). Upserts heartbeat `executor` on every run, regardless of whether any payments were due.
+- `POST /api/cron/daily-summary` — Aggregates today's per-subscription progress, sends Telegram digest. Upserts heartbeat `daily_summary`.
+
+**Auth guard** (shared helper in `src/lib/cron.ts`):
+
+```ts
+export function isAuthorizedCron(req: Request): boolean {
+  return req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
+}
+```
+
+Every cron route returns 401 on a missing/wrong bearer token. The same `CRON_SECRET` env var is consumed by both the script (header) and the route (validation).
 
 ### 4. Healthcheck (`app/api/healthz/route.ts`)
 
-`GET /healthz` returns JSON. Logic:
+`GET /api/healthz` returns JSON. Logic:
 
-1. SELECT every row from `system_heartbeats`.
+1. SELECT every row from `system_heartbeats` via Prisma.
 2. For each job, compute `age = now - last_run_at`.
 3. Thresholds: executor 25 min, planner 32 days, daily-summary 25 h.
 4. If any job is stale → HTTP 503 with `{status: "unhealthy", jobs: [...]}`.
@@ -218,57 +275,65 @@ Each CLI entry imports config + DB, runs one pass, exits. Process lifetime measu
 
 This validates:
 - Web process is up (the route responds at all).
-- SQLite is reachable and not locked (the SELECT succeeds).
-- The Disco scheduler is actually firing the executor (heartbeat is fresh).
-- The shared volume mount works (web sees writes from the scheduled job container).
+- SQLite is reachable (the SELECT succeeds).
+- The Disco cron services are actually firing — because heartbeats are upserted by the cron API routes themselves, freshness is end-to-end proof that Disco fired the schedule, the script ran, the wget succeeded, and the route executed.
 
 GoPay auth and Telegram delivery are deliberately **not** checked here — transient upstream failures shouldn't page us; the executor's own error handling + Telegram alerts cover those.
 
-Point UptimeRobot / Better Stack at `https://<domain>/healthz`.
+Point UptimeRobot / Better Stack at `https://kupsiodstin.cz/api/healthz`.
 
-### 5. Telegram Notifications (`src/telegram/`)
+### 5. Telegram Notifications (`src/lib/telegram.ts`)
 
-Existing bot. Sends:
-- Per-transaction confirmations (subscription name, amount, instalment N/M)
-- Daily summary at 21:00 (per-subscription progress)
-- Monthly summary on the 1st (last month results)
-- Error alerts (failed charges after final retry, GoPay auth failures, planner failures)
+Trivial `"server-only"` wrapper around `https://api.telegram.org/bot${token}/sendMessage`. Same shape as the typo_edita helper — one function `sendTelegram(text)`, no-op if env vars are missing.
 
-### 6. Email (`src/email/`)
+Used by:
+- Cron API routes: per-transaction confirmations, daily summary, monthly recap, error alerts on failed final retries.
+- `disco.json` deploy hooks: a direct `wget` to the Telegram API in `hook:deploy:start:after` pings the chat with deploy status (no Next.js involved — runs inside the migrator image after the new web container is healthy).
 
-Resend wrapper for magic-link emails. Single template: "Click to sign in to <site>" with a 15-min single-use link. Free tier (3k/mo) is overkill.
+### 6. Email (`src/lib/email.ts`)
 
-### 7. Database (`src/db/`)
+Resend wrapper for magic-link emails. Single template: "Click to sign in to Kup si Odstín" with a 15-min single-use link. Free tier (3k/mo) is overkill for an allowlist of ~5 emails.
 
-SQLite via Drizzle ORM + better-sqlite3 in **WAL mode** with `busy_timeout = 5000ms`. The DB file lives on a Disco volume mounted at `/data` on both the web service and the scheduled-job containers. Multi-process writers are safe at our scale (a few writes per minute at peak).
+### 7. Database — Prisma + better-sqlite3 adapter
 
-**Tables:**
-- `users` (id, email UNIQUE, username UNIQUE, created_at, is_admin)
-- `magic_link_tokens` (token PK, email, expires_at, used_at)
-- `colors` (id, hex UNIQUE, name, current_subscription_id NULLABLE)
-- `payment_methods` (id, user_id, gopay_payment_id, last_four, bank_name, status)
-- `subscriptions` (id, user_id, color_id, payment_method_id, monthly_amount_czk, instalments_per_month, status [pending|active|cancelled], started_at, cancelled_at)
-- `subscription_plans` (id, subscription_id, year, month, target_instalments, completed_instalments, status) — one row per subscription per month
-- `scheduled_payments` (id, subscription_plan_id, amount_czk, scheduled_at, status [pending|in_progress|succeeded|failed], attempts, last_error)
-- `transactions` (id, scheduled_payment_id, amount_czk, status, gopay_payment_id, error, executed_at)
-- `system_heartbeats` (job_name PK, last_run_at, last_status, last_message)
+**Stack:** Prisma 7 ORM with `@prisma/adapter-better-sqlite3` driver. Schema in `prisma/schema.prisma`, migrations in `prisma/migrations/`, generated client output to `src/generated/prisma/` (gitignored). Client singleton in `src/lib/db.ts` follows the typo_edita pattern (global cache in dev to survive HMR, fresh instance in prod).
 
-### 8. Config (`src/config.ts`)
+**Storage:** SQLite file on a Disco volume mounted at `/app/data` on the web service, all cron services, and the migrator deploy hook. Multi-process writers are safe at our scale; `better-sqlite3` uses WAL by default and the cron API routes (which would be the contention source) all run sequentially via Disco's scheduler.
 
-No YAML. A single module reads `process.env` once at boot, validates with Zod, and exports a typed `config` object. Tuning knobs that don't realistically vary between environments (schedule window 2-27, hours 8-21, retry policy, healthcheck staleness thresholds) are plain constants in the same file — visible in one place but not pretending to be runtime-configurable.
+**Migrations:** never auto-run on web boot. `Dockerfile.migrator` builds a minimal image that has `node_modules` + `prisma/` + the generated client. `disco.json`'s `hook:deploy:start:before` invokes `./node_modules/.bin/prisma migrate deploy` from that image with the volume mounted, before the new web container is started. A failed migration aborts the deploy.
+
+**Models** (Prisma syntax, fleshed out in `prisma/schema.prisma`):
+
+- `User` (id cuid, email UNIQUE, username UNIQUE, createdAt, isAdmin)
+- `MagicLinkToken` (token PK, email, expiresAt, usedAt nullable)
+- `Color` (id, hex UNIQUE, name, currentSubscriptionId nullable + unique relation to Subscription)
+- `PaymentMethod` (id, userId → User, gopayPaymentId, lastFour, bankName, status)
+- `Subscription` (id, userId → User, colorId → Color, paymentMethodId → PaymentMethod, monthlyAmountCzk Int, instalmentsPerMonth Int, status [pending|active|cancelled], startedAt nullable, cancelledAt nullable)
+- `SubscriptionPlan` (id, subscriptionId → Subscription, year Int, month Int, targetInstalments Int, completedInstalments Int, status; unique on `(subscriptionId, year, month)`)
+- `ScheduledPayment` (id, subscriptionPlanId → SubscriptionPlan, amountCzk Int, scheduledAt, status [pending|in_progress|succeeded|failed], attempts Int default 0, lastError nullable)
+- `Transaction` (id, scheduledPaymentId → ScheduledPayment, amountCzk Int, status, gopayPaymentId nullable, error nullable, executedAt)
+- `SystemHeartbeat` (jobName PK, lastRunAt, lastStatus, lastMessage nullable)
+
+Amounts are stored as integer CZK (e.g. `1000` = 10.00 CZK if we later want hellers; currently we'll work in whole CZK so `100` = 100 CZK). Avoids float drift on instalment rounding.
+
+### 8. Config (`src/lib/config.ts`)
+
+No YAML. A single module reads `process.env` once at boot, validates with Zod 4, and exports a typed `config` object. Tuning knobs that don't realistically vary between environments (schedule window 2-27, hours 8-21, retry policy, healthcheck staleness thresholds) are plain constants in the same file — visible in one place but not pretending to be runtime-configurable.
 
 **Env vars (all required unless noted):**
 
 | Var | Purpose |
 |---|---|
+| `DATABASE_URL` | Prisma connection string, e.g. `file:./data/dev.db` locally, `file:/app/data/gateway.db` in prod |
 | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay API credentials |
 | `GOPAY_SANDBOX` | `"true"` to hit sandbox, default `"false"` |
 | `RESEND_API_KEY` | Magic-link email send |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Notifications |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Notifications + deploy pings |
 | `COOKIE_SECRET` | iron-session encryption key (≥32 bytes) |
 | `ALLOWED_EMAILS` | Comma-separated allowlist; normalised to lowercase + trimmed at boot |
-| `PUBLIC_URL` | e.g. `https://kupsiodstin.cz`; used in magic-link emails and GoPay return URLs |
-| `DATABASE_PATH` | Defaults to `/data/gateway.db` |
+| `CRON_SECRET` | Bearer token shared by `scripts/cron-*.sh` and `/api/cron/*` route guards |
+| `PUBLIC_URL` / `NEXT_PUBLIC_BASE_URL` | e.g. `https://kupsiodstin.cz`; used in magic-link emails and GoPay return URLs |
+| `NEXT_PUBLIC_APP_ENV` | `"development"` / `"production"`; controls Prisma global cache + a few minor UI affordances |
 | `DRY_RUN` | `"true"` to skip actual GoPay/email/Telegram sends, default `"false"` |
 
 **Constants in `src/config.ts`** (not env-driven):
@@ -290,51 +355,68 @@ Card/payment-method details live in the DB after enrollment, never in config.
 ## Project Structure
 
 ```
-card_activity_gateway/
-├── app/                          # Next.js App Router
-│   ├── (public)/
-│   │   ├── page.tsx              # Landing
-│   │   ├── colors/page.tsx       # Catalog
-│   │   ├── colors/[hex]/page.tsx # Color detail
-│   │   ├── login/page.tsx        # Magic-link request
-│   │   ├── terms/page.tsx
-│   │   ├── privacy/page.tsx
-│   │   └── contact/page.tsx
-│   ├── (auth)/
-│   │   ├── dashboard/page.tsx
-│   │   ├── dashboard/subscriptions/[id]/page.tsx
-│   │   └── subscribe/[hex]/page.tsx
-│   ├── api/
-│   │   ├── auth/verify/route.ts
-│   │   ├── gopay/callback/route.ts
-│   │   ├── gopay/notify/route.ts
-│   │   └── healthz/route.ts
-│   ├── layout.tsx
-│   └── globals.css
-├── components/
-│   └── ui/                       # shadcn/ui-generated
-├── lib/                          # shadcn/ui utilities
+card_activity_payment_gateway/
+├── prisma/
+│   ├── schema.prisma             # all models, datasource sqlite
+│   └── migrations/               # generated by prisma migrate dev
 ├── src/
-│   ├── config.ts                 # env parsing + product constants
-│   ├── db/{client,schema}.ts
-│   ├── gopay/{client,types}.ts
-│   ├── auth/{magic-link,session}.ts
-│   ├── email/resend.ts
-│   ├── scheduler/{planner,executor,heartbeat}.ts
-│   ├── telegram/{notifier,templates}.ts
-│   ├── cli/                      # Disco-scheduled entry points
-│   │   ├── execute-due.ts
-│   │   ├── plan-month.ts
-│   │   └── daily-summary.ts
-│   ├── seed/colors.ts            # one-time catalogue import only
-│   └── utils/{logger,random}.ts
-├── data/                         # SQLite (Disco volume mount target)
-├── drizzle.config.ts
-├── next.config.mjs               # output: "standalone"
-├── tailwind.config.ts
-├── tsconfig.json
+│   ├── app/                      # Next.js App Router (under src/ to match typo_edita)
+│   │   ├── (public)/
+│   │   │   ├── page.tsx          # Landing
+│   │   │   ├── colors/page.tsx
+│   │   │   ├── colors/[hex]/page.tsx
+│   │   │   ├── login/page.tsx
+│   │   │   ├── terms/page.tsx
+│   │   │   ├── privacy/page.tsx
+│   │   │   └── contact/page.tsx
+│   │   ├── (auth)/
+│   │   │   ├── dashboard/page.tsx
+│   │   │   ├── dashboard/subscriptions/[id]/page.tsx
+│   │   │   └── subscribe/[hex]/page.tsx
+│   │   ├── api/
+│   │   │   ├── auth/verify/route.ts
+│   │   │   ├── gopay/callback/route.ts
+│   │   │   ├── gopay/notify/route.ts
+│   │   │   ├── cron/execute-due/route.ts
+│   │   │   ├── cron/plan-month/route.ts
+│   │   │   ├── cron/daily-summary/route.ts
+│   │   │   └── healthz/route.ts
+│   │   ├── layout.tsx
+│   │   └── globals.css           # Tailwind v4 @import + @theme
+│   ├── components/
+│   │   └── ui/                   # shadcn/ui-generated components
+│   ├── lib/
+│   │   ├── db.ts                 # Prisma singleton w/ better-sqlite3 adapter
+│   │   ├── config.ts             # Zod-validated env + product constants
+│   │   ├── cron.ts               # isAuthorizedCron + heartbeat helper
+│   │   ├── auth.ts               # iron-session helpers, magic-link issue/verify
+│   │   ├── email.ts              # Resend wrapper
+│   │   ├── telegram.ts           # sendTelegram(text)
+│   │   ├── gopay.ts              # OAuth2 + createPayment/createRecurrence/etc.
+│   │   ├── planner.ts            # schedule generation
+│   │   ├── executor.ts           # due-payment processing
+│   │   ├── username.ts           # CVCVC generator + denylist
+│   │   ├── colors.ts             # catalogue access helpers
+│   │   └── utils.ts              # cn() etc. for shadcn
+│   ├── seed/
+│   │   ├── colors.json           # XKCD colour list (public domain), committed
+│   │   └── seed-colors.ts        # CLI: idempotently insert from colors.json
+│   └── generated/                # gitignored — Prisma client output
+├── scripts/
+│   ├── cron-execute-due.sh
+│   ├── cron-plan-month.sh
+│   └── cron-daily-summary.sh
+├── data/                         # SQLite (Disco volume mount target /app/data)
+├── public/                       # static assets
+├── components.json               # shadcn config
+├── prisma.config.ts              # prisma CLI config, reads DATABASE_URL
+├── next.config.ts                # output: "standalone"
+├── postcss.config.mjs            # @tailwindcss/postcss
+├── tsconfig.json                 # paths: @/* → ./src/*
 ├── package.json
-├── Dockerfile
+├── Dockerfile                    # full Next.js standalone build
+├── Dockerfile.migrator           # minimal — deps + prisma generate only
+├── disco.json                    # web + cron services + deploy hooks
 ├── .env.example
 └── .gitignore
 ```
@@ -343,109 +425,167 @@ card_activity_gateway/
 
 ## Deployment — Disco.cloud
 
-### Dockerfile (sketch)
+Two Dockerfiles, one `disco.json`. Pattern copied from typo_edita.
 
-Multi-stage, Node 20-alpine, non-root, `tini` as PID 1, Next.js `output: "standalone"` for a slim runtime image. The CLI scripts are compiled to `dist/cli/*.js` so they can be invoked without the Next.js server.
+### `Dockerfile` — main web image
+
+Multi-stage Node 22-alpine, Next.js standalone. Mirrors typo_edita's main Dockerfile (build secrets via `/run/secrets/.env`, `npm run build` produces `.next/standalone`, scripts directory copied into runner for cron services).
 
 ```dockerfile
-# syntax=docker/dockerfile:1.7
+FROM node:22-alpine AS base
 
-FROM node:20-alpine AS deps
+# --- Dependencies ---
+FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS build
+# --- Builder ---
+FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build           # next build (standalone) + tsc for src/cli/*
+RUN npx prisma generate
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_APP_ENV=production
+ARG DISCO_DEPLOYMENT_NUMBER
+RUN --mount=type=secret,id=.env \
+  env $(cat /run/secrets/.env | xargs) \
+  npm run build
 
-FROM node:20-alpine AS runtime
+# --- Runner ---
+FROM base AS runner
 WORKDIR /app
-RUN apk add --no-cache tini \
- && addgroup -g 1001 -S app && adduser -u 1001 -S app -G app
-COPY --from=build --chown=app:app /app/.next/standalone ./
-COPY --from=build --chown=app:app /app/.next/static ./.next/static
-COPY --from=build --chown=app:app /app/public ./public
-COPY --from=build --chown=app:app /app/dist/cli ./dist/cli
-COPY --from=build --chown=app:app /app/config ./config
-USER app
-ENV NODE_ENV=production PORT=3000
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --chown=nextjs:nodejs scripts/ ./scripts/
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+USER nextjs
 EXPOSE 3000
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "server.js"]    # Next.js standalone entry
+ENV PORT=3000 HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]
 ```
 
-### Disco orchestration intent
+### `Dockerfile.migrator` — minimal image for migrations + deploy pings
 
-Single image, two roles:
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+RUN npx prisma generate
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+USER nextjs
+```
 
-**1. Web service (long-running)**
-- Image: built from this repo's Dockerfile
-- Command: default (`node server.js`)
-- Port: 3000, mapped to public domain
-- Volume: `data` → `/data` (read-write)
-- Env: `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `RESEND_API_KEY`, `COOKIE_SECRET`, `ALLOWED_EMAILS`
+No build step. Used for `prisma migrate deploy` (`hook:deploy:start:before`) and the post-deploy Telegram wget (`hook:deploy:start:after`).
 
-**2. Scheduled jobs (one-shot, same image, command overridden)**
+### `disco.json`
 
-| Schedule (cron) | Command |
-|---|---|
-| `*/10 * * * *` | `node dist/cli/execute-due.js` |
-| `0 0 1 * *` | `node dist/cli/plan-month.js` |
-| `0 21 * * *` | `node dist/cli/daily-summary.js` |
+```json
+{
+  "version": "1.0",
+  "services": {
+    "hook:deploy:start:before": {
+      "type": "command",
+      "image": "migrator",
+      "command": "./node_modules/.bin/prisma migrate deploy",
+      "volumes": [
+        { "name": "db-data", "destinationPath": "/app/data" }
+      ]
+    },
+    "hook:deploy:start:after": {
+      "type": "command",
+      "image": "migrator",
+      "command": "sh -c 'wget -qO- --post-data=\"chat_id=${TELEGRAM_CHAT_ID}&parse_mode=Markdown&text=✅ Deploy %23${DISCO_DEPLOYMENT_NUMBER} to *${DISCO_PROJECT_NAME}* succeeded (${DISCO_COMMIT})\" \"https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage\" || true'"
+    },
+    "web": {
+      "port": 3000,
+      "volumes": [
+        { "name": "db-data", "destinationPath": "/app/data" }
+      ]
+    },
+    "executor": {
+      "type": "cron",
+      "schedule": "*/10 * * * *",
+      "command": "./scripts/cron-execute-due.sh"
+    },
+    "planner": {
+      "type": "cron",
+      "schedule": "0 0 1 * *",
+      "command": "./scripts/cron-plan-month.sh"
+    },
+    "daily-summary": {
+      "type": "cron",
+      "schedule": "0 21 * * *",
+      "command": "./scripts/cron-daily-summary.sh"
+    }
+  },
+  "images": {
+    "default": { "dockerfile": "Dockerfile" },
+    "migrator": { "dockerfile": "Dockerfile.migrator" }
+  }
+}
+```
 
-Each scheduled job must mount the same `data` volume at `/data` and receive the same env vars as the web service so the GoPay client and Telegram notifier can authenticate.
+Cron services use the `default` image (which has `scripts/` copied in), so they share Node/binary deps with the web service. They don't need the database volume mounted — they only `wget` to the web service, which holds the volume.
 
-**Schema field names are not pinned here** — fill the exact `disco.json` keys from current Disco docs when wiring it up. The intent above is the contract we need Disco to honour.
+### Volumes & multi-container access
 
-### SQLite + multiple containers
-
-The web container and each scheduled-job invocation may write concurrently. Mitigation:
-- Open the DB in **WAL mode** (`PRAGMA journal_mode=WAL`).
-- Set `PRAGMA busy_timeout=5000`.
-- All write transactions are short and scoped (no long-held write locks).
-
-Write volume is < 1 row/s peak, so contention is a non-issue at this scale.
+- The `db-data` named volume is mounted at `/app/data` on the **web** service and on both **deploy hooks** (migrator image).
+- Cron services do not mount the volume — the database is only accessed by the web service via `wget`-triggered API routes.
+- This eliminates the "multiple processes writing to SQLite" concern entirely. Only one process (the Next.js web server) ever opens the DB.
 
 ---
 
 ## Implementation Order
 
 ### Phase 1: Foundation
-1. Project scaffolding — `package.json`, `tsconfig.json`, Next.js init, Tailwind + shadcn/ui init, `.gitignore`
-2. Config loader — `src/config.ts` reads `process.env`, validates with Zod at module load, exports typed `config` + product constants
-3. Database — Drizzle schema (all tables), client, auto-migration on startup, WAL mode
-4. Logger — Pino with basic setup
-5. Color catalogue seed — import ~1000 named colors from public-domain palette
+1. **Project scaffolding** — `package.json` (Next 16 / React 19 / Prisma 7 / Tailwind 4 / Zod 4 / iron-session / Resend / `server-only`), `tsconfig.json` (`@/*` → `./src/*`), `next.config.ts` (`output: "standalone"`), `postcss.config.mjs`, `.gitignore`, `eslint.config.mjs`
+2. **shadcn/ui** — `components.json` configured for Tailwind v4, `src/lib/utils.ts` (`cn` helper), `src/app/globals.css` with `@import "tailwindcss"` + `@theme` block + shadcn CSS variables
+3. **Prisma** — `prisma/schema.prisma` with all 9 models, `prisma.config.ts`, `src/lib/db.ts` (singleton + better-sqlite3 adapter, dev global cache), first migration via `prisma migrate dev --name init`
+4. **Config** — `src/lib/config.ts` reads `process.env`, validates with Zod 4 at module load, exports typed `config` + product constants
+5. **Color catalogue seed** — fetch XKCD public-domain colour list (one-time, via `curl`), commit as `src/seed/colors.json`; `src/seed/seed-colors.ts` idempotently upserts via Prisma; `npm run seed:colors` wires it up
+6. **Telegram + email stubs** — `src/lib/telegram.ts`, `src/lib/email.ts` with `"server-only"` import; ready for later phases
+7. **Skeleton pages** — `src/app/layout.tsx` (root layout with brand header), `src/app/(public)/page.tsx` (placeholder landing), confirm `npm run dev` boots
 
 ### Phase 2: Auth + Shop UI
-6. Magic-link auth — Resend integration, `ALLOWED_EMAILS` allowlist check with silent-success on miss, token table, verify route, session cookies, username generation on first successful verification
-7. Color catalog + detail pages (read-only, no subscribe yet)
-8. Dashboard skeleton (empty states)
+8. Magic-link auth — Resend integration, `ALLOWED_EMAILS` allowlist with silent-success on miss, `MagicLinkToken` lifecycle, iron-session cookie issue/verify, CVCVC username generation on first successful verification (`src/lib/username.ts`)
+9. Color catalog + detail pages (read-only, owner shown as username)
+10. Dashboard skeleton (empty states)
 
 ### Phase 3: GoPay + Subscribe Flow
-10. GoPay API client — OAuth2 auth, createPayment, createRecurrence, getPaymentStatus, voidRecurrence
-11. Subscribe flow — plan configuration form, Server Action that creates `pending` subscription + payment_method + first GoPay payment, redirect to hosted page
-12. GoPay callback + webhook handlers — verify, activate subscription, record first transaction
-13. Test enrollment with GoPay sandbox
+11. GoPay API client (`src/lib/gopay.ts`) — OAuth2 auth, createPayment, createRecurrence, getPaymentStatus, voidRecurrence
+12. Subscribe flow — plan-configuration form, Server Action creates `pending` Subscription + PaymentMethod + first GoPay payment, redirect to hosted page
+13. GoPay callback + webhook handlers (`/api/gopay/callback`, `/api/gopay/notify`) — verify signature, re-fetch status, activate subscription, record first transaction
+14. End-to-end test on GoPay sandbox
 
 ### Phase 4: Scheduler
-14. Planner — generate per-subscription monthly schedules with random distribution
-15. Executor — process due payments, retry policy, transaction recording, heartbeat writes
-16. CLI entry points — `execute-due`, `plan-month`, `daily-summary`
-17. `/healthz` route reading `system_heartbeats`
+15. Planner route (`/api/cron/plan-month`) — per-active-subscription monthly schedule generation with random distribution
+16. Executor route (`/api/cron/execute-due`) — process due payments, retry policy, transaction recording, heartbeat writes
+17. Daily-summary route (`/api/cron/daily-summary`) — aggregate today's progress, Telegram digest
+18. Healthcheck route (`/api/healthz`) reading `SystemHeartbeat`
+19. Shell scripts (`scripts/cron-*.sh`) following the wget pattern
 
 ### Phase 5: Notifications
-18. Telegram notifier — per-tx, daily summary, monthly summary, error alerts
+20. Telegram message templates — per-tx, daily summary, monthly recap, error alerts
 
 ### Phase 6: Deployment
-19. Dockerfile (multi-stage, standalone)
-20. Disco config: web service + 3 scheduled jobs + `data` volume + domain + env secrets
-21. Point UptimeRobot at `/healthz`
-22. End-to-end test on GoPay sandbox: enroll 1 card, run for 2-3 days, verify charges land
-23. Production rollout — enroll all 3 cards, monitor first full month
+21. `Dockerfile` (main, Next.js standalone) + `Dockerfile.migrator`
+22. `disco.json` (web + 3 cron services + 2 deploy hooks + 2 images)
+23. Disco project setup: secrets (env vars), `db-data` volume, domain attached to `web`
+24. Point UptimeRobot at `/api/healthz`
+25. End-to-end on sandbox, then production rollout — subscribe all 3 cards, monitor first full month
 
 ---
 
@@ -463,33 +603,39 @@ Write volume is < 1 row/s peak, so contention is a non-issue at this scale.
 
 ## Key Dependencies
 
+Versions match the typo_edita reference project so we benefit from the same tested compatibility matrix.
+
 ```json
 {
   "dependencies": {
-    "next": "^15",
-    "react": "^19",
-    "react-dom": "^19",
-    "better-sqlite3": "^11",
-    "drizzle-orm": "^0.43",
-    "pino": "^9",
-    "yaml": "^2",
-    "zod": "^3",
-    "resend": "^4",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "prisma": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "better-sqlite3": "^12.9.0",
+    "@types/better-sqlite3": "^7.6.13",
     "iron-session": "^8",
-    "tailwindcss": "^3",
+    "resend": "^6.12.2",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.1",
     "class-variance-authority": "^0.7",
     "clsx": "^2",
     "tailwind-merge": "^2",
     "lucide-react": "^0.4"
   },
   "devDependencies": {
-    "typescript": "^5.8",
-    "drizzle-kit": "^0.31",
-    "@types/better-sqlite3": "^7",
+    "typescript": "^5",
+    "@types/node": "^20",
     "@types/react": "^19",
-    "tsx": "^4"
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4"
   }
 }
 ```
 
-shadcn/ui components are generated into `components/ui/` via the CLI, not installed as a package. No GoPay SDK exists for Node.js — we write the API client directly (their API is straightforward REST + OAuth2). `node-cron` is removed; cron timing is Disco's responsibility.
+shadcn/ui components are generated into `src/components/ui/` via the CLI, not installed as a package — Tailwind v4 mode uses CSS variables defined in `src/app/globals.css` rather than a `tailwind.config.ts`. No GoPay SDK exists for Node.js — we write the API client directly (their API is straightforward REST + OAuth2). No `node-cron`, no `pino` (using `console` for now, Sentry can be added later following the typo_edita pattern), no Drizzle.
