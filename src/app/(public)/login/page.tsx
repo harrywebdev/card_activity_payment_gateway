@@ -1,7 +1,8 @@
-import { BRAND_NAME } from "@/lib/config";
+import Link from "next/link";
+import { Win } from "@/components/win";
 
 export const metadata = {
-  title: `Přihlášení | ${BRAND_NAME}`,
+  title: "Přihlášení | Kup si Odstín",
 };
 
 export default async function LoginPage({
@@ -12,51 +13,128 @@ export default async function LoginPage({
   const { sent, error } = await searchParams;
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8">
-      <div className="w-full max-w-sm space-y-6">
-        <header className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Přihlášení</h1>
-          <p className="text-sm text-muted-foreground">
-            Pošleme ti přihlašovací odkaz na e-mail. Bez hesel.
-          </p>
-        </header>
+    <Win title="C:\KUPSI\LOGIN.COM">
+      <div className="stack-loose" style={{ maxWidth: 680, margin: "10px auto 0" }}>
+        <pre
+          className="ascii"
+          style={{
+            color: "var(--c1)",
+            fontSize: 14,
+            lineHeight: 1.1,
+            margin: 0,
+          }}
+        >
+{`     ┌─ LOGIN.COM ──────────────────────────────────────┐
+     │  Žádná hesla. Žádné OAuth. Jen tvůj e-mail.      │
+     └──────────────────────────────────────────────────┘`}
+        </pre>
+
+        <h1 className="h1">
+          Přihlas se. <span className="em">Jednoduše.</span>
+        </h1>
+        <p className="lede">
+          Necháme ti přijít{" "}
+          <b style={{ color: "rgb(94, 255, 0)" }}>magický odkaz</b> na mail.
+          <br />
+          Klikneš — jsi uvnitř. Žádný captcha, žádný cookie monstr.
+        </p>
 
         {sent && (
-          <div className="rounded-md border border-border bg-muted/50 p-4 text-sm">
-            Pokud je tvůj e-mail mezi povolenými, odkaz dorazil do schránky.
-            Platnost 15 minut.
+          <div
+            className="outset"
+            style={{ padding: 0, borderColor: "var(--c10)" }}
+          >
+            <div
+              style={{
+                background: "var(--c0)",
+                color: "var(--c10)",
+                padding: "4px 12px",
+                fontSize: 13,
+              }}
+            >
+              ── ODESLÁNO ─────────────────────────────────
+            </div>
+            <div style={{ padding: "14px 18px", fontSize: 15 }}>
+              Pokud je tvůj e-mail mezi povolenými, odkaz dorazil do schránky.
+              Platnost 15 minut. Otevři si schránku a klikni na odkaz.
+            </div>
           </div>
         )}
 
         {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm">
-            {error === "invalid" && "Odkaz je neplatný nebo už použitý."}
-            {error === "expired" && "Odkaz vypršel. Požádej o nový."}
-            {error === "not_allowed" && "Tento e-mail nemá přístup."}
+          <div className="outset" style={{ padding: 0 }}>
+            <div
+              style={{
+                background: "var(--c0)",
+                color: "var(--c12)",
+                padding: "4px 12px",
+                fontSize: 13,
+              }}
+            >
+              ── CHYBA ────────────────────────────────────
+            </div>
+            <div style={{ padding: "14px 18px", fontSize: 15, color: "var(--c0)" }}>
+              {error === "invalid" && "Odkaz je neplatný nebo už použitý."}
+              {error === "expired" && "Odkaz vypršel. Požádej o nový."}
+              {error === "not_allowed" && "Tento e-mail nemá přístup."}
+            </div>
           </div>
         )}
 
-        <form action="/api/auth/request-link" method="post" className="space-y-3">
-          <label htmlFor="email" className="sr-only">
-            E-mail
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            placeholder="tvuj@email.cz"
-            autoComplete="email"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition"
+        <div className="outset" style={{ padding: 0 }}>
+          <div
+            style={{
+              background: "var(--c0)",
+              color: "var(--c10)",
+              padding: "4px 12px",
+              fontSize: 13,
+            }}
           >
-            Poslat odkaz
-          </button>
-        </form>
+            ── PŘIHLÁŠENÍ ───────────────────────────────
+          </div>
+          <div style={{ padding: "18px 22px" }}>
+            <form action="/api/auth/request-link" method="post">
+              <div className="field-row">
+                <label htmlFor="email">E-mail:</label>
+                <input
+                  id="email"
+                  name="email"
+                  className="input"
+                  type="email"
+                  required
+                  autoFocus
+                  placeholder="tvuj@email.cz"
+                  autoComplete="email"
+                />
+              </div>
+              <p className="muted" style={{ fontSize: 14, marginTop: 12 }}>
+                Po prvním přihlášení ti přidělíme krátkou přezdívku.
+                <br />
+                Ta se ti pak ukáže u tvojí barvy v katalogu.
+              </p>
+              <hr className="dash" />
+              <div className="row" style={{ justifyContent: "flex-end" }}>
+                <Link className="btn" href="/">
+                  Zpět
+                </Link>
+                <button className="btn btn-primary" type="submit">
+                  ► Poslat odkaz
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <p
+          className="muted"
+          style={{ fontSize: 14, textAlign: "center" }}
+        >
+          Přihlášením souhlasíš s <Link href="/terms">pravidly</Link> a{" "}
+          <Link href="/privacy">zpracováním údajů</Link>.
+          <br />
+          (Skoro nic neukládáme.)
+        </p>
       </div>
-    </main>
+    </Win>
   );
 }

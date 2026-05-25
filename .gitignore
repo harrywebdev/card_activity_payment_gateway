@@ -42,3 +42,7 @@ next-env.d.ts
 .DS_Store
 *.swp
 *~
+
+# Design handoff (reference only — kept locally, not committed)
+/design/
+*-handoff.zip
