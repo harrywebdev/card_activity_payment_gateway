@@ -57,19 +57,59 @@ npm run dev
 
 See [.env.example](.env.example) for the full list of required environment variables, and [.claude/plans/implementation-plan.md](.claude/plans/implementation-plan.md) for the architecture, schema, and Disco deployment intent.
 
-## Deployment
+## Deployment (Disco.cloud)
 
-Two Dockerfiles (`Dockerfile` for the Next.js standalone build, `Dockerfile.migrator` for a minimal image used by deploy hooks). On Disco.cloud:
+Architecture: two Dockerfiles, single `disco.json`.
 
-- **web** — long-running Next.js standalone, port 3000, `db-data` volume mounted at `/app/data`.
-- **Deploy hooks** (one-shot, migrator image):
-  - `hook:deploy:start:before` → `prisma migrate deploy` (aborts the deploy on failure).
-  - `hook:deploy:start:after` → wget to Telegram with deploy status.
-- **Cron services** (`"type": "cron"`, default image, no DB volume — they only `wget` the web service):
-  - `*/10 * * * *` → `scripts/cron-execute-due.sh` → `POST /api/cron/execute-due`
-  - `0 0 1 * *` → `scripts/cron-plan-month.sh` → `POST /api/cron/plan-month`
-  - `0 21 * * *` → `scripts/cron-daily-summary.sh` → `POST /api/cron/daily-summary`
+- `Dockerfile` — full Next.js standalone build. Builds with `--mount=type=secret,id=.env` so Disco's runtime env (containing `DATABASE_URL`, `COOKIE_SECRET`, `ALLOWED_EMAILS`, etc.) is available for the `next build` pass that touches `src/lib/config.ts`.
+- `Dockerfile.migrator` — minimal: `npm ci --ignore-scripts` + `npx prisma generate`. Used by the two deploy hooks below.
 
-Each cron script `wget`s the matching API route on the internal `http://web:3000` hostname with `Authorization: Bearer $CRON_SECRET`. The route does the real work — sharing the same Prisma client and `src/lib/*` modules as the rest of the app — and updates the `SystemHeartbeat` table.
+What `disco.json` declares:
 
-Uptime monitoring: point UptimeRobot / Better Stack at `/api/healthz` — it reads the heartbeat table and only returns 200 if the executor cron has fired within the last 25 minutes, so any failure in the Disco-fires → script → wget → route → DB-write chain pages you.
+- **`web`** — long-running Next.js standalone, port 3000, `db-data` volume mounted at `/app/data`. Default image.
+- **`hook:deploy:start:before`** — runs `./node_modules/.bin/prisma migrate deploy` from the migrator image with the `db-data` volume mounted. If migrations fail the deploy aborts before the new web container starts.
+- **`hook:deploy:start:after`** — wgets the Telegram bot API to post a "Deploy succeeded" notification.
+- **`executor`** — `"type": "cron"`, schedule `*/10 * * * *`, runs `scripts/cron-execute-due.sh` in the default image, which `wget`s `http://web:3000/api/cron/execute-due` with `Authorization: Bearer $CRON_SECRET`.
+- **`planner`** — same shape, schedule `0 0 1 * *`, runs `cron-plan-month.sh`.
+- **`daily-summary`** — same shape, schedule `0 21 * * *`, runs `cron-daily-summary.sh`. (The daily-summary route additionally emits a Monthly Recap to Telegram when it runs on the 1st of the month.)
+
+### First-time setup steps (on Disco)
+
+1. **Create the Disco project** pointing at this repo.
+2. **Create the `db-data` volume.** The hook and the web service both mount it at `/app/data`.
+3. **Set environment variables** (Disco env / secrets — see `.env.example` for the full list with comments):
+
+   | Var | Where to get it |
+   |---|---|
+   | `DATABASE_URL` | Set to `file:/app/data/gateway.db` |
+   | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay merchant dashboard → API keys |
+   | `GOPAY_SANDBOX` | `false` for production, `true` for sandbox |
+   | `ALLOWED_EMAILS` | Comma-separated list of emails permitted to sign in |
+   | `COOKIE_SECRET` | `openssl rand -base64 48` |
+   | `CRON_SECRET` | `openssl rand -base64 32` |
+   | `RESEND_API_KEY` | resend.com dashboard |
+   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | @BotFather and getUpdates |
+   | `NEXT_PUBLIC_BASE_URL` | `https://kupsiodstin.cz` |
+   | `NEXT_PUBLIC_APP_ENV` | `production` |
+   | `DRY_RUN` | `false` for production (`true` skips GoPay/Resend/Telegram sends) |
+
+4. **Attach the domain** `kupsiodstin.cz` to the `web` service. Disco handles the certificate via Let's Encrypt.
+5. **Deploy.** The first deploy will create the SQLite DB on the volume via `prisma migrate deploy`.
+6. **Seed the colour catalogue** (one-shot, idempotent — safe to re-run):
+
+   ```sh
+   curl -sS -X POST \
+     -H "Authorization: Bearer $CRON_SECRET" \
+     https://kupsiodstin.cz/api/admin/seed-colors
+   ```
+
+7. **Point UptimeRobot** (or Better Stack / whatever you use) at `https://kupsiodstin.cz/api/healthz`. The endpoint returns 200 only when every cron's heartbeat is fresher than its threshold (executor 25 min, planner 32 days, daily-summary 25 h). Any breakage in the Disco-fires → script → wget → route → DB-write chain pages you.
+
+### Production checklist
+
+- [ ] `DRY_RUN=false` in Disco env
+- [ ] `GOPAY_SANDBOX=false`
+- [ ] Telegram chat is the right one and `@<your bot> /start` has been issued so it can DM you
+- [ ] Resend domain is verified (otherwise magic-link emails won't land)
+- [ ] Bank cards enrolled with the correct `monthlyAmountCzk` / `instalmentsPerMonth` per bank's bonus criteria
+- [ ] `/api/healthz` is being polled by an external uptime monitor
