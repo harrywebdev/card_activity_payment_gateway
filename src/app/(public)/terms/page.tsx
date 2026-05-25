@@ -76,15 +76,7 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h3 className="h3">6. Můžeme tě vyhodit</h3>
-            <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Když si jako přezdívku zvolíš něco hnusného, vulgárního nebo
-              cíleně urážlivého, dáme ti šanci to opravit. Pak ti rušíme účet a
-              barva se uvolní. <b>Nediskutujeme.</b>
-            </p>
-          </section>
-          <section>
-            <h3 className="h3">7. Tohle není investice</h3>
+            <h3 className="h3">6. Tohle není investice</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
               Vážně. Žádný výnos, žádný sekundární trh, žádné DAO. Když si od
               nás kupuješ barvu, dělá to jenom <b>tobě dobře u srdce</b>.
