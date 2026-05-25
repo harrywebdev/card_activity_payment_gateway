@@ -210,11 +210,22 @@ Disco cron (*/10 min) ─► execute-due.js
                          send Telegram notification
 ```
 
-#### Open questions to verify against current GoPay docs at implementation time
+#### Verified against doc.gopay.cz (Phase 3 implementation)
 
-- **Webhook signature scheme**: HMAC header, signed JWT, or IP allowlist only? Implement signature verification on `/api/gopay/notify` accordingly.
-- **`return_url` query payload**: does GoPay append the payment id automatically, or do we need to encode the subscription id ourselves (which we already do via `?sub=`)?
-- **Contact-email constraints**: whether the email on `createPayment` has to match the actual cardholder, or whether mismatch just logs a warning.
+- **Webhook is HTTP GET**, sent to the `notification_url` with query params `id` (payment id) and on recurrence webhooks `parent_id` (id of the originating ON_DEMAND payment). No signature. Notification carries no state — we MUST refetch payment status by id. (Doc anchor: `odeslani-notifikace`.)
+- **IP allowlist** for optional hardening:
+  - prod: `52.28.190.73, 52.28.96.25, 54.93.75.231, 54.93.48.200`
+  - sandbox: `18.158.112.17, 18.199.189.118, 3.70.41.70`
+- **`return_url`** also receives `?id=<payment_id>` automatically. Our additional `?sub=<subscription_id>` query parameter is preserved.
+- **Token endpoint**: `POST /api/oauth2/token`, Basic auth with base64(client_id:client_secret), Content-Type `application/x-www-form-urlencoded`, body `grant_type=client_credentials&scope=payment-all`. Valid scopes: `payment-all`, `payment-create`.
+- **Payment endpoint**: `POST /api/payments/payment`, JSON, Bearer auth. Amounts in **haléř (integer, 1/100 CZK)** — confirmed by the docs example which sends `amount: 10000, currency: "CZK"` for 100 CZK.
+- **ON_DEMAND recurrence**: `recurrence_cycle: "ON_DEMAND"` + `recurrence_date_to` (future, after the last intended charge). `recurrence_period` is NOT used.
+- **Recurrence (MIT) endpoint**: `POST /api/payments/payment/{id}/create-recurrence`, JSON, Bearer.
+- **Void recurrence**: `POST /api/payments/payment/{id}/void-recurrence`.
+
+#### Still to verify on first live sandbox run
+
+- **Contact-email constraints**: whether mismatch between `payer.contact.email` and the actual cardholder produces an error or just a warning.
 - **MIT 3DS exemption boundaries**: confirm the `ON_DEMAND` recurrence flow does not re-trigger SCA after the initial enrolment, including under PSD2 step-up rules (large amounts, unusual patterns).
 
 ### 3. Scheduler (Disco cron → shell script → API route)

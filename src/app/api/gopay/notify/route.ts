@@ -5,25 +5,27 @@ import { planSubscriptionForMonth, splitAmount } from "@/lib/planner";
 import { sendTelegram } from "@/lib/telegram";
 
 /**
- * GoPay server-to-server notification. Body shape from GoPay is just the
- * payment id (POSTed as form data with key `id`, or as `?id=` in the query
- * string depending on the request). We do NOT trust the payload — we look
- * up the payment by id, refetch its status from GoPay, and act on that.
+ * GoPay server-to-server notification.
  *
- * GoPay does not sign notifications; the contract is "we tell you the id,
- * you ask us for the status". Idempotent by design.
+ * Per doc.gopay.cz/#odeslani-notifikace:
+ * - HTTP GET (not POST)
+ * - Query params: `id` (payment id) and on recurrence webhooks `parent_id`
+ *   (id of the originating ON_DEMAND payment)
+ * - The notification carries no state — we MUST refetch payment status by id
+ *   to learn what actually happened. Idempotent by design.
+ * - No signature header. Security model is "id arrives, you fetch status".
+ *   For optional hardening you can IP-allowlist GoPay's notification IPs:
+ *     prod:    52.28.190.73, 52.28.96.25, 54.93.75.231, 54.93.48.200
+ *     sandbox: 18.158.112.17, 18.199.189.118, 3.70.41.70
  */
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   const url = new URL(req.url);
-  let paymentId = url.searchParams.get("id");
-  if (!paymentId) {
-    try {
-      const form = await req.formData();
-      paymentId = form.get("id")?.toString() ?? null;
-    } catch {
-      // ignore — not form-encoded
-    }
-  }
+  const paymentId = url.searchParams.get("id");
+  // parent_id is supplied on recurrence webhooks; we accept it for logging
+  // but don't strictly need it (the transaction row already references the
+  // PaymentMethod through scheduledPayment).
+  const parentId = url.searchParams.get("parent_id");
+
   if (!paymentId) {
     return NextResponse.json({ error: "missing payment id" }, { status: 400 });
   }
@@ -36,8 +38,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "status_fetch_failed" }, { status: 502 });
   }
 
-  // Find the matching pending subscription (initial enrolment) OR the
-  // existing one whose payment_method.gopayPaymentId matches (a recurrence).
+  // Initial-enrolment notification: we recorded initialGopayPaymentId
+  // immediately after createPayment, so this lookup finds the pending sub.
   const subscription = await prisma.subscription.findUnique({
     where: { initialGopayPaymentId: String(paymentId) },
     include: { color: true, user: true, paymentMethod: true },
@@ -47,16 +49,17 @@ export async function POST(req: Request) {
     return handleInitialEnrolmentNotification(subscription, status, String(paymentId));
   }
 
-  // Otherwise this is likely a recurrence notification — look up the
-  // matching transaction by gopayPaymentId and update its status. (Executor
-  // already does this synchronously when it calls createRecurrence, but
-  // we acknowledge here for completeness.)
-  const tx = await prisma.transaction.findFirst({
-    where: { gopayPaymentId: String(paymentId) },
-  });
-  if (tx) {
-    // The executor records final state inline; nothing to do here.
-    return NextResponse.json({ ok: true, kind: "recurrence_ack" });
+  // Otherwise: a recurrence (MIT) notification. The executor records final
+  // state inline when it calls createRecurrence, so this is just an ack —
+  // we log parent_id for traceability if we want to correlate to a saved
+  // PaymentMethod later.
+  if (parentId) {
+    const tx = await prisma.transaction.findFirst({
+      where: { gopayPaymentId: String(paymentId) },
+    });
+    if (tx) {
+      return NextResponse.json({ ok: true, kind: "recurrence_ack" });
+    }
   }
 
   return NextResponse.json({ ok: true, kind: "unknown_payment_ignored" });
@@ -83,13 +86,6 @@ async function handleInitialEnrolmentNotification(
     // user can retry from the colour detail page.
     return NextResponse.json({ ok: true, kind: "not_paid", state: status.state });
   }
-
-  // Atomic activation:
-  // 1. Create PaymentMethod with the saved card token (= initialGopayPaymentId).
-  // 2. Link Subscription → PaymentMethod, set status=active, startedAt=now.
-  // 3. Set Color.currentSubscriptionId.
-  // 4. Create this month's SubscriptionPlan + remaining ScheduledPayments.
-  // 5. Record the first Transaction.
 
   const lastFour = extractLastFour(status.payer?.payment_card?.card_number);
   const bankName = status.payer?.payment_card?.issuer_bank ?? null;
@@ -136,10 +132,8 @@ async function handleInitialEnrolmentNotification(
     alreadyCompleted: 1,
   });
 
-  // Find the freshly created plan to attach the first Transaction to.
-  // We need a ScheduledPayment row for the first instalment too so the
-  // Transaction has a parent; we create a synthetic "completed at creation"
-  // ScheduledPayment for it.
+  // Synthesise a "succeeded at creation" ScheduledPayment to parent the
+  // first Transaction onto.
   const firstScheduled = await prisma.scheduledPayment.create({
     data: {
       subscriptionPlanId: planId,
@@ -160,7 +154,6 @@ async function handleInitialEnrolmentNotification(
     },
   });
 
-  // Telegram ping (best-effort).
   try {
     await sendTelegram(
       `🎨 Nové předplatné: <b>${subscription.color.name}</b> (${subscription.color.hex}) — ` +
