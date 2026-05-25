@@ -69,6 +69,10 @@ model Subscription {
   monthlyAmountCzk      Int
   instalmentsPerMonth   Int
   status                String    @default("pending") // pending | active | cancelled
+  // Set right after the initial GoPay createPayment call. Lets the webhook
+  // find the pending subscription by payment id. Becomes the recurrence
+  // token (mirrored into PaymentMethod.gopayPaymentId) on activation.
+  initialGopayPaymentId String?   @unique
   startedAt             DateTime?
   cancelledAt           DateTime?
   createdAt             DateTime  @default(now())
