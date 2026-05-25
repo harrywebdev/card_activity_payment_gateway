@@ -292,9 +292,7 @@ export async function createRecurrence(
     currency: "CZK",
     order_number: input.orderNumber,
     order_description: input.orderDescription,
-    items: [
-      { name: input.orderDescription, amount: amountHellers, count: 1 },
-    ],
+    items: [{ name: input.orderDescription, amount: amountHellers, count: 1 }],
   };
 
   const res = await authedFetch(

@@ -14,7 +14,10 @@ export default async function LoginPage({
 
   return (
     <Win title="C:\KUPSI\LOGIN.COM">
-      <div className="stack-loose" style={{ maxWidth: 680, margin: "10px auto 0" }}>
+      <div
+        className="stack-loose"
+        style={{ maxWidth: 680, margin: "10px auto 0" }}
+      >
         <pre
           className="ascii"
           style={{
@@ -24,7 +27,7 @@ export default async function LoginPage({
             margin: 0,
           }}
         >
-{`     ┌─ LOGIN.COM ──────────────────────────────────────┐
+          {`     ┌─ LOGIN.COM ──────────────────────────────────────┐
      │  Žádná hesla. Žádné OAuth. Jen tvůj e-mail.      │
      └──────────────────────────────────────────────────┘`}
         </pre>
@@ -73,7 +76,9 @@ export default async function LoginPage({
             >
               ── CHYBA ────────────────────────────────────
             </div>
-            <div style={{ padding: "14px 18px", fontSize: 15, color: "var(--c0)" }}>
+            <div
+              style={{ padding: "14px 18px", fontSize: 15, color: "var(--c0)" }}
+            >
               {error === "invalid" && "Odkaz je neplatný nebo už použitý."}
               {error === "expired" && "Odkaz vypršel. Požádej o nový."}
               {error === "not_allowed" && "Tento e-mail nemá přístup."}
@@ -125,10 +130,7 @@ export default async function LoginPage({
           </div>
         </div>
 
-        <p
-          className="muted"
-          style={{ fontSize: 14, textAlign: "center" }}
-        >
+        <p className="muted" style={{ fontSize: 14, textAlign: "center" }}>
           Přihlášením souhlasíš s <Link href="/terms">pravidly</Link> a{" "}
           <Link href="/privacy">zpracováním údajů</Link>.
           <br />

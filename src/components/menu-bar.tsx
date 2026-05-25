@@ -30,9 +30,7 @@ export async function MenuBar() {
   return (
     <div className="menubar">
       <span className="menubar-brand">
-        <span style={{ color: "var(--c4)" }}>◆</span>
-        {" "}
-        <b>K</b>upSiOdstín
+        <span style={{ color: "var(--c4)" }}>◆</span> <b>K</b>upSiOdstín
       </span>
       {items.map((it) => (
         <Link key={it.href} className="menubar-item" href={it.href}>

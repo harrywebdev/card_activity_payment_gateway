@@ -14,7 +14,9 @@ export async function generateMetadata({
   const fullHex = `#${hex.toLowerCase()}`;
   const color = await getColorByHex(fullHex);
   return {
-    title: color ? `${color.name} (${fullHex}) | Kup si Odstín` : "Kup si Odstín",
+    title: color
+      ? `${color.name} (${fullHex}) | Kup si Odstín`
+      : "Kup si Odstín",
   };
 }
 
@@ -35,8 +37,7 @@ export default async function ColorDetail({
   const owner = color.currentSubscription?.user;
 
   // Is THIS user the owner?
-  const isMine =
-    user && owner ? user.username === owner.username : false;
+  const isMine = user && owner ? user.username === owner.username : false;
 
   // First instalment date (if owned) — looked up from the subscription
   let ownerStartDate: Date | null = null;
@@ -72,7 +73,11 @@ export default async function ColorDetail({
               }}
             >
               <span className="corner">{String(meta.i).padStart(2, "0")}</span>
-              <span className={"badge " + (color.currentSubscriptionId ? "taken" : "free")}>
+              <span
+                className={
+                  "badge " + (color.currentSubscriptionId ? "taken" : "free")
+                }
+              >
                 {color.currentSubscriptionId ? "OBSAZENO" : "VOLNÝ"}
               </span>
               <div
@@ -147,7 +152,9 @@ export default async function ColorDetail({
                   </tr>
                   <tr>
                     <td>Český název</td>
-                    <td style={{ textTransform: "capitalize" }}>{color.name}</td>
+                    <td style={{ textTransform: "capitalize" }}>
+                      {color.name}
+                    </td>
                   </tr>
                   <tr>
                     <td>Anglický název</td>

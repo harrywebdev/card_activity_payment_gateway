@@ -15,11 +15,11 @@
 
 For micro-transactions in CZK:
 
-| Processor | Per-tx fee | Monthly fee | Cost on a 20 CZK charge |
-|-----------|-----------|-------------|-------------------------|
-| Stripe | 1.5% + 6.50 CZK | 0 CZK | 6.80 CZK (34%) |
-| Comgate | 1% + 0 CZK | 100 CZK | 0.20 CZK (1%) |
-| **GoPay** | **0.95% + 0 CZK** | **80 CZK** | **0.19 CZK (0.95%)** |
+| Processor | Per-tx fee        | Monthly fee | Cost on a 20 CZK charge |
+| --------- | ----------------- | ----------- | ----------------------- |
+| Stripe    | 1.5% + 6.50 CZK   | 0 CZK       | 6.80 CZK (34%)          |
+| Comgate   | 1% + 0 CZK        | 100 CZK     | 0.20 CZK (1%)           |
+| **GoPay** | **0.95% + 0 CZK** | **80 CZK**  | **0.19 CZK (0.95%)**    |
 
 GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest percentage rate, ON_DEMAND recurring payment support, 12 months free on the Start plan.
 
@@ -69,19 +69,19 @@ What `disco.json` declares:
 2. **Create the `db-data` volume.** The hook and the web service both mount it at `/app/data`.
 3. **Set environment variables** (Disco env / secrets — see `.env.example` for the full list with comments):
 
-   | Var | Where to get it |
-   |---|---|
-   | `DATABASE_URL` | Set to `file:/app/data/gateway.db` |
-   | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay merchant dashboard → API keys |
-   | `GOPAY_SANDBOX` | `false` for production, `true` for sandbox |
-   | `ALLOWED_EMAILS` | Comma-separated list of emails permitted to sign in |
-   | `COOKIE_SECRET` | `openssl rand -base64 48` |
-   | `CRON_SECRET` | `openssl rand -base64 32` |
-   | `RESEND_API_KEY` | resend.com dashboard |
-   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | @BotFather and getUpdates |
-   | `NEXT_PUBLIC_BASE_URL` | `https://kupsiodstin.cz` |
-   | `NEXT_PUBLIC_APP_ENV` | `production` |
-   | `DRY_RUN` | `false` for production (`true` skips GoPay/Resend/Telegram sends) |
+   | Var                                                           | Where to get it                                                   |
+   | ------------------------------------------------------------- | ----------------------------------------------------------------- |
+   | `DATABASE_URL`                                                | Set to `file:/app/data/gateway.db`                                |
+   | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay merchant dashboard → API keys                               |
+   | `GOPAY_SANDBOX`                                               | `false` for production, `true` for sandbox                        |
+   | `ALLOWED_EMAILS`                                              | Comma-separated list of emails permitted to sign in               |
+   | `COOKIE_SECRET`                                               | `openssl rand -base64 48`                                         |
+   | `CRON_SECRET`                                                 | `openssl rand -base64 32`                                         |
+   | `RESEND_API_KEY`                                              | resend.com dashboard                                              |
+   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                      | @BotFather and getUpdates                                         |
+   | `NEXT_PUBLIC_BASE_URL`                                        | `https://kupsiodstin.cz`                                          |
+   | `NEXT_PUBLIC_APP_ENV`                                         | `production`                                                      |
+   | `DRY_RUN`                                                     | `false` for production (`true` skips GoPay/Resend/Telegram sends) |
 
 4. **Attach the domain** `kupsiodstin.cz` to the `web` service. Disco handles the certificate via Let's Encrypt.
 5. **Deploy.** The first deploy will create the SQLite DB on the volume via `prisma migrate deploy`.

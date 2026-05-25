@@ -26,10 +26,18 @@ export async function POST(req: Request) {
   if (!/^#[0-9a-f]{6}$/.test(hex)) {
     redirect("/colors");
   }
-  if (!Number.isFinite(monthlyAmountCzk) || monthlyAmountCzk < 1 || monthlyAmountCzk > 100_000) {
+  if (
+    !Number.isFinite(monthlyAmountCzk) ||
+    monthlyAmountCzk < 1 ||
+    monthlyAmountCzk > 100_000
+  ) {
     back(hex, "invalid_amount");
   }
-  if (!Number.isFinite(instalmentsPerMonth) || instalmentsPerMonth < 1 || instalmentsPerMonth > 31) {
+  if (
+    !Number.isFinite(instalmentsPerMonth) ||
+    instalmentsPerMonth < 1 ||
+    instalmentsPerMonth > 31
+  ) {
     back(hex, "invalid_instalments");
   }
   // GoPay's effective minimum per charge is 1 CZK — card networks reject
@@ -52,7 +60,6 @@ export async function POST(req: Request) {
     },
   });
   if (dupe) back(hex, "already_subscribed");
-
   // Need the email for the GoPay contact field; requireUser only returns id+username.
   const userRow = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },

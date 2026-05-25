@@ -169,7 +169,8 @@ export async function POST(req: Request) {
             console.error("Telegram failure alert failed:", telegramErr);
           }
         } else {
-          const backoffMin = EXECUTOR.retryBackoffMinutes[newAttempts - 1] ?? 60;
+          const backoffMin =
+            EXECUTOR.retryBackoffMinutes[newAttempts - 1] ?? 60;
           const nextAt = new Date(Date.now() + backoffMin * 60_000);
           await prisma.scheduledPayment.update({
             where: { id: sp.id },
@@ -206,7 +207,14 @@ export async function POST(req: Request) {
       console.error("Telegram executor-error alert failed:", telegramErr);
     }
     return NextResponse.json(
-      { error: "executor_failed", message, processed, succeeded, retried, failed },
+      {
+        error: "executor_failed",
+        message,
+        processed,
+        succeeded,
+        retried,
+        failed,
+      },
       { status: 500 },
     );
   }

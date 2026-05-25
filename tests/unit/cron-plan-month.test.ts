@@ -28,7 +28,9 @@ async function createActiveSub(hex = "#000000") {
 
 describe("POST /api/cron/plan-month", () => {
   it("rejects unauthorized requests", async () => {
-    const r = await POST(new Request("http://localhost/api/cron/plan-month", { method: "POST" }));
+    const r = await POST(
+      new Request("http://localhost/api/cron/plan-month", { method: "POST" }),
+    );
     expect(r.status).toBe(401);
   });
 
@@ -51,7 +53,9 @@ describe("POST /api/cron/plan-month", () => {
 
   it("writes a heartbeat row", async () => {
     await POST(authedRequest());
-    const hb = await prisma.systemHeartbeat.findUnique({ where: { jobName: "planner" } });
+    const hb = await prisma.systemHeartbeat.findUnique({
+      where: { jobName: "planner" },
+    });
     expect(hb).not.toBeNull();
     expect(hb!.lastStatus).toBe("ok");
   });

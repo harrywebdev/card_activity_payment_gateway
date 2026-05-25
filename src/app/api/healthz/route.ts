@@ -23,7 +23,10 @@ export async function GET() {
     const heartbeats = await prisma.systemHeartbeat.findMany({});
     const now = Date.now();
 
-    const expected: Record<string, { staleAfterMs: number; required: boolean }> = {
+    const expected: Record<
+      string,
+      { staleAfterMs: number; required: boolean }
+    > = {
       executor: {
         staleAfterMs: HEALTHCHECK.executorStaleMinutes * 60_000,
         required: true,

@@ -18,7 +18,7 @@ export default function TermsPage() {
             margin: 0,
           }}
         >
-{`     ╔══════════════════════════════════════════════════╗
+          {`     ╔══════════════════════════════════════════════════╗
      ║  PRAVIDLA.TXT — Co si přesně kupuješ             ║
      ║  Aktualizováno: 25. 5. 2026                      ║
      ╚══════════════════════════════════════════════════╝`}
@@ -45,9 +45,9 @@ export default function TermsPage() {
           <section>
             <h3 className="h3">2. Cenu a splátky určuješ ty</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Minimální měsíční částka je <b>1&nbsp;Kč</b>, maximální 100&nbsp;000&nbsp;Kč.
-              Počet splátek za měsíc 1–31. Strhává se průběžně během měsíce
-              přes GoPay.
+              Minimální měsíční částka je <b>1&nbsp;Kč</b>, maximální
+              100&nbsp;000&nbsp;Kč. Počet splátek za měsíc 1–31. Strhává se
+              průběžně během měsíce přes GoPay.
             </p>
           </section>
           <section>
@@ -60,8 +60,9 @@ export default function TermsPage() {
           <section>
             <h3 className="h3">4. Můžeš barvu pustit kdykoliv</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Napiš mail na <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>{" "}
-              a barvu uvolníme. Žádná výpovědní doba, žádné poslední 3 měsíce.{" "}
+              Napiš mail na{" "}
+              <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a> a
+              barvu uvolníme. Žádná výpovědní doba, žádné poslední 3 měsíce.{" "}
               <b>Pustíš — zmizí.</b>
             </p>
           </section>
@@ -86,8 +87,7 @@ export default function TermsPage() {
             <h3 className="h3">7. Tohle není investice</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
               Vážně. Žádný výnos, žádný sekundární trh, žádné DAO. Když si od
-              nás kupuješ barvu, dělá to jenom{" "}
-              <b>tobě dobře u srdce</b>.
+              nás kupuješ barvu, dělá to jenom <b>tobě dobře u srdce</b>.
             </p>
           </section>
         </div>

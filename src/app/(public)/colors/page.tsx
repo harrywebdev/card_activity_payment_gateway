@@ -111,7 +111,10 @@ export default async function CatalogPage({
                     </span>
                   </div>
                   <div className="sw-meta">
-                    <span className="name" style={{ textTransform: "capitalize" }}>
+                    <span
+                      className="name"
+                      style={{ textTransform: "capitalize" }}
+                    >
                       {c.name}
                     </span>
                     <span className="num">{c.hex}</span>
@@ -123,7 +126,10 @@ export default async function CatalogPage({
         </div>
 
         {sorted.length === 0 && (
-          <div className="inset center" style={{ padding: 40, color: "var(--c8)" }}>
+          <div
+            className="inset center"
+            style={{ padding: 40, color: "var(--c8)" }}
+          >
             Žádné barvy v této kategorii.
             <br />
             Zkus jiný filtr.

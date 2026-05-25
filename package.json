@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "seed:colors": "tsx src/seed/seed-colors.ts",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -36,6 +38,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "prettier": "^3.8.3",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5",

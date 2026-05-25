@@ -48,12 +48,16 @@ describe("POST /api/admin/seed-colors", () => {
     const body = await r.json();
     expect(body.pruned).toBe(1);
 
-    const stillThere = await prisma.color.findUnique({ where: { hex: "#deadbe" } });
+    const stillThere = await prisma.color.findUnique({
+      where: { hex: "#deadbe" },
+    });
     expect(stillThere).toBeNull();
   });
 
   it("does NOT prune an off-catalogue colour that has a current subscription", async () => {
-    const user = await prisma.user.create({ data: { email: "u@x.cz", username: "vumin" } });
+    const user = await prisma.user.create({
+      data: { email: "u@x.cz", username: "vumin" },
+    });
     const offCat = await prisma.color.create({
       data: { hex: "#deadbe", name: "garbage" },
     });
@@ -76,7 +80,9 @@ describe("POST /api/admin/seed-colors", () => {
     const body = await r.json();
     expect(body.retainedOwned).toBe(1);
 
-    const stillThere = await prisma.color.findUnique({ where: { hex: "#deadbe" } });
+    const stillThere = await prisma.color.findUnique({
+      where: { hex: "#deadbe" },
+    });
     expect(stillThere).not.toBeNull();
   });
 });

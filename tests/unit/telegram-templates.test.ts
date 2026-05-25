@@ -122,7 +122,12 @@ describe("tplInstalmentFailure", () => {
 describe("tplDailySummary", () => {
   it("returns null when there are no subscriptions", () => {
     expect(
-      tplDailySummary({ date: new Date(), subs: [], totalSuccess: 0, totalFailed: 0 }),
+      tplDailySummary({
+        date: new Date(),
+        subs: [],
+        totalSuccess: 0,
+        totalFailed: 0,
+      }),
     ).toBeNull();
   });
 

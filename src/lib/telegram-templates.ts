@@ -184,8 +184,7 @@ export function tplPlannerError(error: string): string {
 }
 
 export function tplExecutorError(error: string): string {
-  return [
-    `⚠️ <b>Vykonavatel splátek selhal</b>`,
-    `<i>${esc(error)}</i>`,
-  ].join("\n");
+  return [`⚠️ <b>Vykonavatel splátek selhal</b>`, `<i>${esc(error)}</i>`].join(
+    "\n",
+  );
 }

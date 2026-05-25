@@ -1,0 +1,25 @@
+node_modules
+.next
+build
+dist
+
+# Prisma migration SQL is generated; don't touch it.
+prisma/migrations
+
+# Generated Prisma client.
+src/generated
+
+# Local SQLite + Disco volume mount target.
+data
+*.db
+*.db-journal
+
+# Design handoff (reference only).
+design
+*-handoff.zip
+
+# Lock files.
+package-lock.json
+
+# OS / editor cruft.
+.DS_Store

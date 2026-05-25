@@ -46,7 +46,10 @@ export default async function ResultPage({
 
   return (
     <Win title="C:\KUPSI\GOPAY.RET">
-      <div className="stack-loose" style={{ maxWidth: 760, margin: "10px auto" }}>
+      <div
+        className="stack-loose"
+        style={{ maxWidth: 760, margin: "10px auto" }}
+      >
         <pre
           className="ascii"
           style={{
@@ -164,9 +167,12 @@ export default async function ResultPage({
               Obnov stránku za chvíli, nebo mrkni do{" "}
               <Link href="/dashboard">Můj účet</Link>.
             </p>
-            <div className="inset" style={{ background: "var(--c0)", color: "var(--c14)" }}>
+            <div
+              className="inset"
+              style={{ background: "var(--c0)", color: "var(--c14)" }}
+            >
               <pre style={{ margin: 0, fontSize: 13 }}>
-{`> subscription status: ${subscription.status}
+                {`> subscription status: ${subscription.status}
 > waiting for: GoPay notification webhook
 > retry: refresh this page in 5–30 seconds`}
               </pre>

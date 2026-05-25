@@ -11,10 +11,18 @@ export async function StatusBar() {
 
   return (
     <div className="statusbar">
-      <span className="key"><b>F1</b>&nbsp;Nápověda</span>
-      <span className="key"><b>F2</b>&nbsp;{user ? "Účet" : "Přihlásit"}</span>
-      <span className="key"><b>F3</b>&nbsp;Katalog</span>
-      <span className="key"><b>F10</b>&nbsp;Menu</span>
+      <span className="key">
+        <b>F1</b>&nbsp;Nápověda
+      </span>
+      <span className="key">
+        <b>F2</b>&nbsp;{user ? "Účet" : "Přihlásit"}
+      </span>
+      <span className="key">
+        <b>F3</b>&nbsp;Katalog
+      </span>
+      <span className="key">
+        <b>F10</b>&nbsp;Menu
+      </span>
       <span className="statusbar-spacer" />
       <span className="key">
         VOLNÝCH:&nbsp;

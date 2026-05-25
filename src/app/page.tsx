@@ -26,7 +26,12 @@ export default async function Home() {
               Je to <b>úplná blbost</b>. A přesto to chceš.
             </p>
             <p
-              style={{ fontSize: 15, color: "var(--c0)", marginTop: 0, marginBottom: 4 }}
+              style={{
+                fontSize: 15,
+                color: "var(--c0)",
+                marginTop: 0,
+                marginBottom: 4,
+              }}
             >
               Žádných 949 odstínů. Jenom těch <b>16</b>,
               <br />
@@ -39,13 +44,14 @@ export default async function Home() {
                 [<span className="hot">K</span>] Vyber si barvu
               </Link>
               <Link className="btn" href={user ? "/dashboard" : "/login"}>
-                [<span className="hot">P</span>] {user ? "Můj účet" : "Přihlas se"}
+                [<span className="hot">P</span>]{" "}
+                {user ? "Můj účet" : "Přihlas se"}
               </Link>
             </div>
             <p className="muted" style={{ marginTop: 14, fontSize: 14 }}>
               ► {free} z 16 barev je teď{" "}
-              <span style={{ color: "var(--c4)" }}>volných</span>. Než někomu padnou
-              do oka.
+              <span style={{ color: "var(--c4)" }}>volných</span>. Než někomu
+              padnou do oka.
             </p>
           </div>
 
@@ -172,8 +178,8 @@ export default async function Home() {
             <h3 className="h3">Jeden majitel.</h3>
             <p style={{ fontSize: 15, color: "var(--c0)", margin: 0 }}>
               Každá z 16 barev má v daný okamžik{" "}
-              <b style={{ color: "var(--c4)" }}>právě jednoho</b> vlastníka. Žádný
-              společný majetek, žádné edice. Jeden účet — jedna barva.
+              <b style={{ color: "var(--c4)" }}>právě jednoho</b> vlastníka.
+              Žádný společný majetek, žádné edice. Jeden účet — jedna barva.
             </p>
           </div>
           <div>

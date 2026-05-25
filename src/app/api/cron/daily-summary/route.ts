@@ -60,7 +60,8 @@ export async function POST(req: Request) {
     for (const sub of activeSubs) {
       const plan = sub.plans[0];
       const completedThisMonth = plan?.completedInstalments ?? 0;
-      const targetThisMonth = plan?.targetInstalments ?? sub.instalmentsPerMonth;
+      const targetThisMonth =
+        plan?.targetInstalments ?? sub.instalmentsPerMonth;
 
       const todayTx = await prisma.transaction.findMany({
         where: {
@@ -69,7 +70,9 @@ export async function POST(req: Request) {
         },
         select: { status: true, amountCzk: true },
       });
-      const todaySuccess = todayTx.filter((t) => t.status === "succeeded").length;
+      const todaySuccess = todayTx.filter(
+        (t) => t.status === "succeeded",
+      ).length;
       const todayFail = todayTx.filter((t) => t.status === "failed").length;
       const todayAmount = todayTx
         .filter((t) => t.status === "succeeded")
@@ -128,7 +131,9 @@ export async function POST(req: Request) {
       });
 
       const monthProgress: MonthSubProgress[] = lastMonthPlans.map((plan) => {
-        const succeededTx = plan.scheduledPayments.flatMap((sp) => sp.transactions);
+        const succeededTx = plan.scheduledPayments.flatMap(
+          (sp) => sp.transactions,
+        );
         const amount = succeededTx.reduce((a, t) => a + t.amountCzk, 0);
         return {
           color: {

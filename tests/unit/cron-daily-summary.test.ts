@@ -13,7 +13,9 @@ function authedRequest() {
 describe("POST /api/cron/daily-summary", () => {
   it("rejects unauthorized requests", async () => {
     const r = await POST(
-      new Request("http://localhost/api/cron/daily-summary", { method: "POST" }),
+      new Request("http://localhost/api/cron/daily-summary", {
+        method: "POST",
+      }),
     );
     expect(r.status).toBe(401);
   });
@@ -84,9 +86,11 @@ describe("POST /api/cron/daily-summary", () => {
 
     // Spy + force "now" to 2026-06-01 21:00 so the day-1 branch fires.
     const sent: string[] = [];
-    const spy = vi.spyOn(telegram, "sendTelegram").mockImplementation(async (txt) => {
-      sent.push(txt);
-    });
+    const spy = vi
+      .spyOn(telegram, "sendTelegram")
+      .mockImplementation(async (txt) => {
+        sent.push(txt);
+      });
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 1, 21, 0, 0));
 
@@ -124,7 +128,9 @@ describe("POST /api/cron/daily-summary", () => {
     const user = await prisma.user.create({
       data: { email: "ds@example.com", username: "vumin" },
     });
-    const color = await prisma.color.create({ data: { hex: "#000000", name: "černá" } });
+    const color = await prisma.color.create({
+      data: { hex: "#000000", name: "černá" },
+    });
     const sub = await prisma.subscription.create({
       data: {
         userId: user.id,

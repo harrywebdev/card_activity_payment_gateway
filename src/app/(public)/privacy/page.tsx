@@ -18,7 +18,7 @@ export default function PrivacyPage() {
             margin: 0,
           }}
         >
-{`     ╔══════════════════════════════════════════════════╗
+          {`     ╔══════════════════════════════════════════════════╗
      ║  GDPR.TXT — Co o tobě víme a co s tím děláme    ║
      ╚══════════════════════════════════════════════════╝`}
         </pre>
@@ -60,7 +60,9 @@ export default function PrivacyPage() {
 
         <h3 className="h3">Co o tobě nemáme</h3>
         <ul style={{ fontSize: 15, color: "var(--c0)" }}>
-          <li>Tvoje skutečné jméno a adresu (pokud nám je sám nepošleš v mailu)</li>
+          <li>
+            Tvoje skutečné jméno a adresu (pokud nám je sám nepošleš v mailu)
+          </li>
           <li>Údaje o kartě — drží je GoPay, my vidíme jen ID transakce</li>
           <li>Žádný marketingový profil, žádný tracking po jiných webech</li>
           <li>Nemáme cookies třetích stran. Žádné. Vůbec.</li>
@@ -68,8 +70,8 @@ export default function PrivacyPage() {
 
         <h3 className="h3">Komu to dáváme</h3>
         <p style={{ fontSize: 15, color: "var(--c0)" }}>
-          <b>GoPay s.r.o.</b> (platby) a <b>Resend</b> (rozesílání mailů). Účetnímu
-          jednou ročně souhrn. Nikomu jinému.
+          <b>GoPay s.r.o.</b> (platby) a <b>Resend</b> (rozesílání mailů).
+          Účetnímu jednou ročně souhrn. Nikomu jinému.
         </p>
 
         <h3 className="h3">Tvoje práva</h3>

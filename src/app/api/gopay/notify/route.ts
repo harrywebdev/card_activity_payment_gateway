@@ -47,7 +47,11 @@ export async function GET(req: Request) {
   });
 
   if (subscription) {
-    return handleInitialEnrolmentNotification(subscription, status, String(paymentId));
+    return handleInitialEnrolmentNotification(
+      subscription,
+      status,
+      String(paymentId),
+    );
   }
 
   // Otherwise: a recurrence (MIT) notification. The executor records final
@@ -74,7 +78,10 @@ async function handleInitialEnrolmentNotification(
     user: { username: string; email: string };
     paymentMethod: { id: string; gopayPaymentId: string } | null;
   },
-  status: { state: string; payer?: { payment_card?: { card_number?: string; issuer_bank?: string } } },
+  status: {
+    state: string;
+    payer?: { payment_card?: { card_number?: string; issuer_bank?: string } };
+  },
   gopayPaymentId: string,
 ) {
   // Already activated — webhook is being retried; just ack.
@@ -85,7 +92,11 @@ async function handleInitialEnrolmentNotification(
   if (status.state !== "PAID") {
     // Cancelled / timeouted / etc. — leave the subscription pending; the
     // user can retry from the colour detail page.
-    return NextResponse.json({ ok: true, kind: "not_paid", state: status.state });
+    return NextResponse.json({
+      ok: true,
+      kind: "not_paid",
+      state: status.state,
+    });
   }
 
   const lastFour = extractLastFour(status.payer?.payment_card?.card_number);

@@ -127,6 +127,7 @@ App Router with Server Components by default. **No Server Actions** — every mu
 Tailwind v4 + shadcn/ui (CSS-variable mode, no `tailwind.config.ts`). Prisma/SQLite access lives in `src/lib/db.ts` and is imported directly from server components and route handlers.
 
 Key flows:
+
 - **Login**: form posts to `/api/auth/request-link` → handler reads FormData, calls `issueMagicLink(email)` (allowlist check inside the lib so it silently no-ops for non-allowlisted addresses), redirects to `/login?sent=1`. UX response is identical whether or not the email is recognised, so the form can't be used for enumeration.
 - **Verify**: `/api/auth/verify?token=…` consumes the token (single-use + expiry), find-or-creates the User with a CVCVC username on first verification, sets the iron-session cookie, redirects to `/dashboard`.
 - **Logout**: `/api/auth/logout` (POST) destroys the session, redirects to `/`.
@@ -137,6 +138,7 @@ Key flows:
 ### 2. GoPay API Client (`src/gopay/`)
 
 Thin typed wrapper around GoPay's REST API:
+
 - `authenticate()` — OAuth2 Client Credentials grant (server-to-server). Caches bearer token until expiry. **This is for our backend talking to GoPay's API — no user involvement.**
 - `createPayment(params)` — initial enrolment payment. Sends `recurrence.recurrenceCycle: ON_DEMAND` so the resulting payment ID can be reused as a token. Returns the payment object including `gw_url` (the hosted payment page).
 - `createRecurrence(originalPaymentId, amount, orderMeta)` — MIT charge for subsequent instalments. Pure server-to-server, no customer interaction.
@@ -190,6 +192,7 @@ Browser              kupsiodstin.cz (Next.js)         GoPay API           GoPay 
 ```
 
 **URLs:**
+
 - `return_url` = `${PUBLIC_URL}/api/gopay/callback?sub=<subscription_id>` — handled by `app/api/gopay/callback/route.ts`. Renders user-facing success/failure UI only; does NOT mutate state.
 - `notification_url` = `${PUBLIC_URL}/api/gopay/notify` — handled by `app/api/gopay/notify/route.ts`. The trusted state-mutation path. Verifies the webhook signature, calls `getPaymentStatus()` to confirm, then writes.
 
@@ -246,11 +249,11 @@ Disco cron service ──► scripts/cron-<name>.sh ──► wget http://web:30
 
 **Cron services** (all in `disco.json` under `services`):
 
-| Service | Schedule | Script | Endpoint |
-|---|---|---|---|
-| `executor` | `*/10 * * * *` | `scripts/cron-execute-due.sh` | `POST /api/cron/execute-due` |
-| `planner` | `0 0 1 * *` | `scripts/cron-plan-month.sh` | `POST /api/cron/plan-month` |
-| `daily-summary` | `0 21 * * *` | `scripts/cron-daily-summary.sh` | `POST /api/cron/daily-summary` |
+| Service         | Schedule       | Script                          | Endpoint                       |
+| --------------- | -------------- | ------------------------------- | ------------------------------ |
+| `executor`      | `*/10 * * * *` | `scripts/cron-execute-due.sh`   | `POST /api/cron/execute-due`   |
+| `planner`       | `0 0 1 * *`    | `scripts/cron-plan-month.sh`    | `POST /api/cron/plan-month`    |
+| `daily-summary` | `0 21 * * *`   | `scripts/cron-daily-summary.sh` | `POST /api/cron/daily-summary` |
 
 **Shell script pattern** (matches typo_edita's convention; every script identical except the URL):
 
@@ -276,7 +279,9 @@ echo "execute-due: $RESPONSE" >&2
 
 ```ts
 export function isAuthorizedCron(req: Request): boolean {
-  return req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
+  return (
+    req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`
+  );
 }
 ```
 
@@ -293,6 +298,7 @@ Every cron route returns 401 on a missing/wrong bearer token. The same `CRON_SEC
 5. Otherwise HTTP 200 with `{status: "ok", jobs: [...]}`.
 
 This validates:
+
 - Web process is up (the route responds at all).
 - SQLite is reachable (the SELECT succeeds).
 - The Disco cron services are actually firing — because heartbeats are upserted by the cron API routes themselves, freshness is end-to-end proof that Disco fired the schedule, the script ran, the wget succeeded, and the route executed.
@@ -306,6 +312,7 @@ Point UptimeRobot / Better Stack at `https://kupsiodstin.cz/api/healthz`.
 Trivial `"server-only"` wrapper around `https://api.telegram.org/bot${token}/sendMessage`. Same shape as the typo_edita helper — one function `sendTelegram(text)`, no-op if env vars are missing.
 
 Used by:
+
 - Cron API routes: per-transaction confirmations, daily summary, monthly recap, error alerts on failed final retries.
 - `disco.json` deploy hooks: a direct `wget` to the Telegram API in `hook:deploy:start:after` pings the chat with deploy status (no Next.js involved — runs inside the migrator image after the new web container is healthy).
 
@@ -341,19 +348,19 @@ No YAML. A single module reads `process.env` once at boot, validates with Zod 4,
 
 **Env vars (all required unless noted):**
 
-| Var | Purpose |
-|---|---|
-| `DATABASE_URL` | Prisma connection string, e.g. `file:./data/dev.db` locally, `file:/app/data/gateway.db` in prod |
-| `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay API credentials |
-| `GOPAY_SANDBOX` | `"true"` to hit sandbox, default `"false"` |
-| `RESEND_API_KEY` | Magic-link email send |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Notifications + deploy pings |
-| `COOKIE_SECRET` | iron-session encryption key (≥32 bytes) |
-| `ALLOWED_EMAILS` | Comma-separated allowlist; normalised to lowercase + trimmed at boot |
-| `CRON_SECRET` | Bearer token shared by `scripts/cron-*.sh` and `/api/cron/*` route guards |
-| `PUBLIC_URL` / `NEXT_PUBLIC_BASE_URL` | e.g. `https://kupsiodstin.cz`; used in magic-link emails and GoPay return URLs |
-| `NEXT_PUBLIC_APP_ENV` | `"development"` / `"production"`; controls Prisma global cache + a few minor UI affordances |
-| `DRY_RUN` | `"true"` to skip actual GoPay/email/Telegram sends, default `"false"` |
+| Var                                                           | Purpose                                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                                | Prisma connection string, e.g. `file:./data/dev.db` locally, `file:/app/data/gateway.db` in prod |
+| `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay API credentials                                                                            |
+| `GOPAY_SANDBOX`                                               | `"true"` to hit sandbox, default `"false"`                                                       |
+| `RESEND_API_KEY`                                              | Magic-link email send                                                                            |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                      | Notifications + deploy pings                                                                     |
+| `COOKIE_SECRET`                                               | iron-session encryption key (≥32 bytes)                                                          |
+| `ALLOWED_EMAILS`                                              | Comma-separated allowlist; normalised to lowercase + trimmed at boot                             |
+| `CRON_SECRET`                                                 | Bearer token shared by `scripts/cron-*.sh` and `/api/cron/*` route guards                        |
+| `PUBLIC_URL` / `NEXT_PUBLIC_BASE_URL`                         | e.g. `https://kupsiodstin.cz`; used in magic-link emails and GoPay return URLs                   |
+| `NEXT_PUBLIC_APP_ENV`                                         | `"development"` / `"production"`; controls Prisma global cache + a few minor UI affordances      |
+| `DRY_RUN`                                                     | `"true"` to skip actual GoPay/email/Telegram sends, default `"false"`                            |
 
 **Constants in `src/config.ts`** (not env-driven):
 
@@ -519,9 +526,7 @@ No build step. Used for `prisma migrate deploy` (`hook:deploy:start:before`) and
       "type": "command",
       "image": "migrator",
       "command": "./node_modules/.bin/prisma migrate deploy",
-      "volumes": [
-        { "name": "db-data", "destinationPath": "/app/data" }
-      ]
+      "volumes": [{ "name": "db-data", "destinationPath": "/app/data" }]
     },
     "hook:deploy:start:after": {
       "type": "command",
@@ -530,9 +535,7 @@ No build step. Used for `prisma migrate deploy` (`hook:deploy:start:before`) and
     },
     "web": {
       "port": 3000,
-      "volumes": [
-        { "name": "db-data", "destinationPath": "/app/data" }
-      ]
+      "volumes": [{ "name": "db-data", "destinationPath": "/app/data" }]
     },
     "executor": {
       "type": "cron",
@@ -570,6 +573,7 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 ## Implementation Order
 
 ### Phase 1: Foundation
+
 1. **Project scaffolding** — `package.json` (Next 16 / React 19 / Prisma 7 / Tailwind 4 / Zod 4 / iron-session / Resend / `server-only`), `tsconfig.json` (`@/*` → `./src/*`), `next.config.ts` (`output: "standalone"`), `postcss.config.mjs`, `.gitignore`, `eslint.config.mjs`
 2. **shadcn/ui** — `components.json` configured for Tailwind v4, `src/lib/utils.ts` (`cn` helper), `src/app/globals.css` with `@import "tailwindcss"` + `@theme` block + shadcn CSS variables
 3. **Prisma** — `prisma/schema.prisma` with all 9 models, `prisma.config.ts`, `src/lib/db.ts` (singleton + better-sqlite3 adapter, dev global cache), first migration via `prisma migrate dev --name init`
@@ -579,17 +583,20 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 7. **Skeleton pages** — `src/app/layout.tsx` (root layout with brand header), `src/app/(public)/page.tsx` (placeholder landing), confirm `npm run dev` boots
 
 ### Phase 2: Auth + Shop UI
+
 8. Magic-link auth — Resend integration, `ALLOWED_EMAILS` allowlist with silent-success on miss, `MagicLinkToken` lifecycle, iron-session cookie issue/verify, CVCVC username generation on first successful verification (`src/lib/username.ts`)
 9. Color catalog + detail pages (read-only, owner shown as username)
 10. Dashboard skeleton (empty states)
 
 ### Phase 3: GoPay + Subscribe Flow
+
 11. GoPay API client (`src/lib/gopay.ts`) — OAuth2 auth, createPayment, createRecurrence, getPaymentStatus, voidRecurrence
 12. Subscribe flow — plan-configuration form, Server Action creates `pending` Subscription + PaymentMethod + first GoPay payment, redirect to hosted page
 13. GoPay callback + webhook handlers (`/api/gopay/callback`, `/api/gopay/notify`) — verify signature, re-fetch status, activate subscription, record first transaction
 14. End-to-end test on GoPay sandbox
 
 ### Phase 4: Scheduler
+
 15. Planner route (`/api/cron/plan-month`) — per-active-subscription monthly schedule generation with random distribution
 16. Executor route (`/api/cron/execute-due`) — process due payments, retry policy, transaction recording, heartbeat writes
 17. Daily-summary route (`/api/cron/daily-summary`) — aggregate today's progress, Telegram digest
@@ -597,9 +604,11 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 19. Shell scripts (`scripts/cron-*.sh`) following the wget pattern
 
 ### Phase 5: Notifications
+
 20. Telegram message templates — per-tx, daily summary, monthly recap, error alerts
 
 ### Phase 6: Deployment
+
 21. `Dockerfile` (main, Next.js standalone) + `Dockerfile.migrator`
 22. `disco.json` (web + 3 cron services + 2 deploy hooks + 2 images)
 23. Disco project setup: secrets (env vars), `db-data` volume, domain attached to `web`

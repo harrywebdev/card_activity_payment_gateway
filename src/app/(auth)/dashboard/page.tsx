@@ -21,7 +21,7 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
         lineHeight: 1.05,
       }}
     >
-{`[${filled}${empty}] ${done}/${total}`}
+      {`[${filled}${empty}] ${done}/${total}`}
     </pre>
   );
 }
@@ -148,8 +148,7 @@ export default async function DashboardPage({
               {formatCzk(totalMonthly)}
             </div>
             <p className="muted" style={{ margin: 0 }}>
-              napříč {activeCount}{" "}
-              {activeCount === 1 ? "odstínem" : "odstíny"}
+              napříč {activeCount} {activeCount === 1 ? "odstínem" : "odstíny"}
             </p>
           </div>
           <div className="outset stack-tight">
@@ -168,8 +167,11 @@ export default async function DashboardPage({
 
         {subscriptions.length === 0 ? (
           <div className="inset center" style={{ padding: "40px 20px" }}>
-            <pre className="ascii" style={{ color: "var(--c8)", margin: "0 0 14px" }}>
-{`     ┌──────────────┐
+            <pre
+              className="ascii"
+              style={{ color: "var(--c8)", margin: "0 0 14px" }}
+            >
+              {`     ┌──────────────┐
      │              │
      │   ŽÁDNÁ      │
      │   BARVA      │
@@ -193,7 +195,9 @@ export default async function DashboardPage({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "var(--c0)", color: "var(--c14)" }}>
-                <th style={{ textAlign: "left", padding: "4px 10px" }}>Barva</th>
+                <th style={{ textAlign: "left", padding: "4px 10px" }}>
+                  Barva
+                </th>
                 <th style={{ textAlign: "left", padding: "4px 10px" }}>Hex</th>
                 <th style={{ textAlign: "left", padding: "4px 10px" }}>
                   Tento měsíc
@@ -201,7 +205,9 @@ export default async function DashboardPage({
                 <th style={{ textAlign: "right", padding: "4px 10px" }}>
                   Měsíčně
                 </th>
-                <th style={{ textAlign: "right", padding: "4px 10px" }}>Stav</th>
+                <th style={{ textAlign: "right", padding: "4px 10px" }}>
+                  Stav
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -286,7 +292,8 @@ export default async function DashboardPage({
           <div>
             <h3 className="h3">Něco se rozbilo?</h3>
             <p style={{ fontSize: 15, color: "var(--c0)", margin: 0 }}>
-              Napiš na <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>.
+              Napiš na{" "}
+              <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>.
               <br />
               Pokud máš barvu a rozhodneš se ji pustit, napiš mail.
             </p>

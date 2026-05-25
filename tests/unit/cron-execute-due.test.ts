@@ -18,7 +18,9 @@ async function setupSubAndDuePayment(opts?: {
   const user = await prisma.user.create({
     data: { email: "exec@example.com", username: "vumin" },
   });
-  const color = await prisma.color.create({ data: { hex: "#000000", name: "černá" } });
+  const color = await prisma.color.create({
+    data: { hex: "#000000", name: "černá" },
+  });
   const pm = await prisma.paymentMethod.create({
     data: {
       userId: user.id,
@@ -63,7 +65,9 @@ async function setupSubAndDuePayment(opts?: {
 
 describe("POST /api/cron/execute-due", () => {
   it("rejects unauthorized requests", async () => {
-    const r = await POST(new Request("http://localhost/api/cron/execute-due", { method: "POST" }));
+    const r = await POST(
+      new Request("http://localhost/api/cron/execute-due", { method: "POST" }),
+    );
     expect(r.status).toBe(401);
   });
 
@@ -74,20 +78,28 @@ describe("POST /api/cron/execute-due", () => {
     expect(body.processed).toBe(1);
     expect(body.succeeded).toBe(1);
 
-    const updated = await prisma.scheduledPayment.findUnique({ where: { id: sp.id } });
+    const updated = await prisma.scheduledPayment.findUnique({
+      where: { id: sp.id },
+    });
     expect(updated!.status).toBe("succeeded");
     expect(updated!.attempts).toBe(1);
 
-    const tx = await prisma.transaction.findFirst({ where: { scheduledPaymentId: sp.id } });
+    const tx = await prisma.transaction.findFirst({
+      where: { scheduledPaymentId: sp.id },
+    });
     expect(tx!.status).toBe("succeeded");
     expect(tx!.gopayPaymentId).toBeTruthy();
 
-    const updatedPlan = await prisma.subscriptionPlan.findUnique({ where: { id: plan.id } });
+    const updatedPlan = await prisma.subscriptionPlan.findUnique({
+      where: { id: plan.id },
+    });
     expect(updatedPlan!.completedInstalments).toBe(2); // was 1, +1
   });
 
   it("skips not-yet-due payments", async () => {
-    await setupSubAndDuePayment({ scheduledAt: new Date(Date.now() + 60 * 60_000) });
+    await setupSubAndDuePayment({
+      scheduledAt: new Date(Date.now() + 60 * 60_000),
+    });
     const r = await POST(authedRequest());
     const body = await r.json();
     expect(body.processed).toBe(0);
@@ -104,12 +116,16 @@ describe("POST /api/cron/execute-due", () => {
     expect(body.retried).toBe(1);
     expect(body.failed).toBe(0);
 
-    const updated = await prisma.scheduledPayment.findUnique({ where: { id: sp.id } });
+    const updated = await prisma.scheduledPayment.findUnique({
+      where: { id: sp.id },
+    });
     expect(updated!.status).toBe("pending");
     expect(updated!.attempts).toBe(1);
     expect(updated!.lastError).toContain("simulated transient");
     // scheduledAt pushed into the future (10 min backoff)
-    expect(updated!.scheduledAt.getTime()).toBeGreaterThan(Date.now() + 5 * 60_000);
+    expect(updated!.scheduledAt.getTime()).toBeGreaterThan(
+      Date.now() + 5 * 60_000,
+    );
 
     spy.mockRestore();
   });
@@ -124,11 +140,15 @@ describe("POST /api/cron/execute-due", () => {
     const body = await r.json();
     expect(body.failed).toBe(1);
 
-    const updated = await prisma.scheduledPayment.findUnique({ where: { id: sp.id } });
+    const updated = await prisma.scheduledPayment.findUnique({
+      where: { id: sp.id },
+    });
     expect(updated!.status).toBe("failed");
     expect(updated!.attempts).toBe(3);
 
-    const tx = await prisma.transaction.findFirst({ where: { scheduledPaymentId: sp.id } });
+    const tx = await prisma.transaction.findFirst({
+      where: { scheduledPaymentId: sp.id },
+    });
     expect(tx!.status).toBe("failed");
     expect(tx!.error).toContain("hard failure");
 
@@ -138,7 +158,9 @@ describe("POST /api/cron/execute-due", () => {
   it("writes a heartbeat row even when nothing is due", async () => {
     const r = await POST(authedRequest());
     expect(r.status).toBe(200);
-    const hb = await prisma.systemHeartbeat.findUnique({ where: { jobName: "executor" } });
+    const hb = await prisma.systemHeartbeat.findUnique({
+      where: { jobName: "executor" },
+    });
     expect(hb).not.toBeNull();
     expect(hb!.lastStatus).toBe("ok");
   });

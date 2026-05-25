@@ -48,8 +48,17 @@ export async function POST(req: Request) {
       else skipped++;
     }
 
-    await recordHeartbeat("planner", "ok", `created=${created} skipped=${skipped}`);
-    return NextResponse.json({ ok: true, created, skipped, total: active.length });
+    await recordHeartbeat(
+      "planner",
+      "ok",
+      `created=${created} skipped=${skipped}`,
+    );
+    return NextResponse.json({
+      ok: true,
+      created,
+      skipped,
+      total: active.length,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await recordHeartbeat("planner", "error", message).catch(() => {});
@@ -58,6 +67,9 @@ export async function POST(req: Request) {
     } catch (telegramErr) {
       console.error("Telegram planner-error alert failed:", telegramErr);
     }
-    return NextResponse.json({ error: "planner_failed", message }, { status: 500 });
+    return NextResponse.json(
+      { error: "planner_failed", message },
+      { status: 500 },
+    );
   }
 }

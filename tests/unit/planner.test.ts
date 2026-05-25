@@ -5,7 +5,9 @@ import { SCHEDULE } from "@/lib/config";
 
 describe("splitAmount", () => {
   it("sums exactly to the total", () => {
-    expect(splitAmount(100, 10)).toEqual([10, 10, 10, 10, 10, 10, 10, 10, 10, 10]);
+    expect(splitAmount(100, 10)).toEqual([
+      10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+    ]);
     expect(splitAmount(100, 7).reduce((a, x) => a + x, 0)).toBe(100);
     expect(splitAmount(1000, 13).reduce((a, x) => a + x, 0)).toBe(1000);
     expect(splitAmount(1, 1)).toEqual([1]);
@@ -30,11 +32,15 @@ describe("splitAmount", () => {
 });
 
 describe("planSubscriptionForMonth", () => {
-  async function setupSubscription(overrides: { instalmentsPerMonth?: number; monthlyAmountCzk?: number } = {}) {
+  async function setupSubscription(
+    overrides: { instalmentsPerMonth?: number; monthlyAmountCzk?: number } = {},
+  ) {
     const user = await prisma.user.create({
       data: { email: "tester@example.com", username: "vumin" },
     });
-    const color = await prisma.color.create({ data: { hex: "#000000", name: "černá" } });
+    const color = await prisma.color.create({
+      data: { hex: "#000000", name: "černá" },
+    });
     const subscription = await prisma.subscription.create({
       data: {
         userId: user.id,
@@ -100,7 +106,9 @@ describe("planSubscriptionForMonth", () => {
   });
 
   it("schedules every instalment even when the day window is short (late-month subscribe)", async () => {
-    const { subscription } = await setupSubscription({ instalmentsPerMonth: 10 });
+    const { subscription } = await setupSubscription({
+      instalmentsPerMonth: 10,
+    });
     // Subscribe on the 25th — only days 26, 27 remain before SCHEDULE.endDay (27).
     const asOf = new Date(2026, 5, 25, 10, 0, 0);
 

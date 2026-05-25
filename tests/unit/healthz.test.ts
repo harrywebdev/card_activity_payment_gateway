@@ -57,7 +57,12 @@ describe("GET /api/healthz", () => {
     const fresh = new Date();
     await prisma.systemHeartbeat.createMany({
       data: [
-        { jobName: "executor", lastRunAt: fresh, lastStatus: "error", lastMessage: "boom" },
+        {
+          jobName: "executor",
+          lastRunAt: fresh,
+          lastStatus: "error",
+          lastMessage: "boom",
+        },
         { jobName: "planner", lastRunAt: fresh, lastStatus: "ok" },
         { jobName: "daily_summary", lastRunAt: fresh, lastStatus: "ok" },
       ],

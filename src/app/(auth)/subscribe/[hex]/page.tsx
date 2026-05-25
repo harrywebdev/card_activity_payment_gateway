@@ -65,9 +65,7 @@ export default async function SubscribePage({
                 aspectRatio: "1/1",
               }}
             >
-              <span className="corner">
-                {String(meta.i).padStart(2, "0")}
-              </span>
+              <span className="corner">{String(meta.i).padStart(2, "0")}</span>
               <span className="badge free">VOLNÝ</span>
               <div
                 style={{

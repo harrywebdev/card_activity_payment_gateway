@@ -109,7 +109,7 @@ export function SubscribeForm({
             }}
           >
             <pre style={{ margin: 0, fontSize: 13 }}>
-{`> ${serverErrorMessage(serverError)}`}
+              {`> ${serverErrorMessage(serverError)}`}
             </pre>
           </div>
         )}
@@ -177,7 +177,7 @@ export function SubscribeForm({
             }}
           >
             <pre style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap" }}>
-{`> ${inlineError}`}
+              {`> ${inlineError}`}
             </pre>
           </div>
         )}

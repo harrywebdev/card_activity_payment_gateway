@@ -30,7 +30,9 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(16),
 
   NEXT_PUBLIC_BASE_URL: z.string().url(),
-  NEXT_PUBLIC_APP_ENV: z.enum(["development", "production"]).default("development"),
+  NEXT_PUBLIC_APP_ENV: z
+    .enum(["development", "production"])
+    .default("development"),
 
   DRY_RUN: z
     .string()

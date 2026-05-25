@@ -14,7 +14,8 @@ export default async function setup() {
   // Provide env values that satisfy src/lib/config.ts at module-load time.
   process.env.DATABASE_URL = `file:${TEST_DB_PATH}`;
   process.env.GOPAY_CLIENT_ID = process.env.GOPAY_CLIENT_ID ?? "test-client";
-  process.env.GOPAY_CLIENT_SECRET = process.env.GOPAY_CLIENT_SECRET ?? "test-secret";
+  process.env.GOPAY_CLIENT_SECRET =
+    process.env.GOPAY_CLIENT_SECRET ?? "test-secret";
   process.env.GOPAY_MERCHANT_ID = process.env.GOPAY_MERCHANT_ID ?? "12345678";
   process.env.GOPAY_SANDBOX = "true";
   process.env.ALLOWED_EMAILS =
@@ -22,7 +23,8 @@ export default async function setup() {
   process.env.COOKIE_SECRET =
     process.env.COOKIE_SECRET ??
     "00000000000000000000000000000000000000000000000000000000";
-  process.env.CRON_SECRET = process.env.CRON_SECRET ?? "test-cron-secret-for-tests";
+  process.env.CRON_SECRET =
+    process.env.CRON_SECRET ?? "test-cron-secret-for-tests";
   process.env.RESEND_API_KEY = process.env.RESEND_API_KEY ?? "test-resend";
   process.env.NEXT_PUBLIC_BASE_URL =
     process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
