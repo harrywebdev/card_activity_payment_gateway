@@ -20,7 +20,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_APP_ENV=production
 ARG DISCO_DEPLOYMENT_NUMBER
 RUN --mount=type=secret,id=.env \
-  env $(cat /run/secrets/.env | xargs) \
+  env $(grep -v '^#' /run/secrets/.env | grep -v '^\s*$' | xargs) \
   npm run build
 
 # --- Runner ---
