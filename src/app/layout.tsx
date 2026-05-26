@@ -43,6 +43,8 @@ export default function RootLayout({
           </div>
           <StatusBar />
         </div>
+        <div className="crt-scanlines" />
+        <div className="crt-vignette" />
       </body>
     </html>
   );
