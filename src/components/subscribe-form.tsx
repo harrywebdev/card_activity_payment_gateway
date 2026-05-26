@@ -197,14 +197,26 @@ export function SubscribeForm({
               </td>
             </tr>
             <tr>
+              <td>Důvod platby</td>
+              <td>předplatné vlastnictví odstínu</td>
+            </tr>
+            <tr>
               <td>Měsíční částka</td>
               <td>
-                <b>{formatCzk(amountValid ? amount : 0)}</b>
+                <b>{formatCzk(amountValid ? amount : 0)}</b> (fixní)
               </td>
             </tr>
             <tr>
+              <td>Max. částka splátky</td>
+              <td>{formatCzk(maxPart)}</td>
+            </tr>
+            <tr>
               <td>Rozdělení</td>
-              <td>{perInstalmentLabel}</td>
+              <td>{perInstalmentLabel} (fixní frekvence)</td>
+            </tr>
+            <tr>
+              <td>Trvání</td>
+              <td>do zrušení — bez výpovědní doby</td>
             </tr>
             <tr>
               <td>První splátka</td>
@@ -212,10 +224,40 @@ export function SubscribeForm({
             </tr>
             <tr>
               <td>Další splátky</td>
-              <td>automaticky během měsíce</td>
+              <td>automaticky, rovnoměrně během měsíce</td>
+            </tr>
+            <tr>
+              <td>Zrušení</td>
+              <td>
+                kdykoliv na{" "}
+                <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>
+              </td>
             </tr>
           </tbody>
         </table>
+
+        <label
+          className="muted"
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            fontSize: 13,
+            marginTop: 14,
+            cursor: "pointer",
+          }}
+        >
+          <input type="checkbox" name="consent" required style={{ marginTop: 3 }} />
+          <span>
+            Souhlasím se založením opakované platby s výše uvedenými parametry a
+            s uložením platebních údajů u GoPay (PCI DSS Level 1). Beru na
+            vědomí{" "}
+            <Link href="/terms" target="_blank">
+              pravidla
+            </Link>
+            .
+          </span>
+        </label>
 
         <div
           className="row"
