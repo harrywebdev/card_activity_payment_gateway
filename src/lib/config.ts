@@ -12,7 +12,10 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
 
-  RESEND_API_KEY: z.string().min(1),
+  MAILGUN_API_KEY: z.string().min(1),
+  MAILGUN_DOMAIN: z.string().min(1),
+  MAILGUN_FROM: z.string().min(1),
+  MAILGUN_REGION: z.enum(["eu", "us"]).default("eu"),
 
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),

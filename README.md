@@ -28,7 +28,7 @@ GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest pe
 - **TypeScript / Next.js 16** (App Router, server components)
 - **Tailwind CSS v4** + a custom MS-DOS textmode design (CGA 16 palette, VT323 + IBM Plex Mono)
 - **iron-session** — stateless encrypted-cookie auth, no sessions table
-- **Resend** — magic-link emails
+- **Mailgun** — magic-link emails (HTTP API, free tier 5k/mo)
 - **GoPay** — payment processing (REST API, OAuth2, ON_DEMAND recurrence, merchant-initiated transactions)
 - **SQLite** via Prisma 7 + `@prisma/adapter-better-sqlite3`; migrations run via `prisma migrate deploy` in a dedicated migrator container on every deploy
 - **Disco.cloud** — Docker deployment with two images (main + migrator) and native cron scheduler
@@ -38,7 +38,7 @@ GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest pe
 
 ```bash
 cp .env.example .env
-# Fill in GoPay credentials, Resend key, Telegram bot token, allowlisted emails, etc.
+# Fill in GoPay credentials, Mailgun key + domain, Telegram bot token, allowlisted emails, etc.
 # Generate COOKIE_SECRET with: openssl rand -base64 48
 
 npm install
@@ -69,19 +69,20 @@ What `disco.json` declares:
 2. **Create the `db-data` volume.** The hook and the web service both mount it at `/app/data`.
 3. **Set environment variables** (Disco env / secrets — see `.env.example` for the full list with comments):
 
-   | Var                                                           | Where to get it                                                   |
-   | ------------------------------------------------------------- | ----------------------------------------------------------------- |
-   | `DATABASE_URL`                                                | Set to `file:/app/data/gateway.db`                                |
-   | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay merchant dashboard → API keys                               |
-   | `GOPAY_SANDBOX`                                               | `false` for production, `true` for sandbox                        |
-   | `ALLOWED_EMAILS`                                              | Comma-separated list of emails permitted to sign in               |
-   | `COOKIE_SECRET`                                               | `openssl rand -base64 48`                                         |
-   | `CRON_SECRET`                                                 | `openssl rand -base64 32`                                         |
-   | `RESEND_API_KEY`                                              | resend.com dashboard                                              |
-   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                      | @BotFather and getUpdates                                         |
-   | `NEXT_PUBLIC_BASE_URL`                                        | `https://kupsiodstin.cz`                                          |
-   | `NEXT_PUBLIC_APP_ENV`                                         | `production`                                                      |
-   | `DRY_RUN`                                                     | `false` for production (`true` skips GoPay/Resend/Telegram sends) |
+   | Var                                                           | Where to get it                                                                               |
+   | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+   | `DATABASE_URL`                                                | Set to `file:/app/data/gateway.db`                                                            |
+   | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay merchant dashboard → API keys                                                           |
+   | `GOPAY_SANDBOX`                                               | `false` for production, `true` for sandbox                                                    |
+   | `ALLOWED_EMAILS`                                              | Comma-separated list of emails permitted to sign in                                           |
+   | `COOKIE_SECRET`                                               | `openssl rand -base64 48`                                                                     |
+   | `CRON_SECRET`                                                 | `openssl rand -base64 32`                                                                     |
+   | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM`           | Mailgun dashboard → API security; domain you've verified (or the sandbox subdomain initially) |
+   | `MAILGUN_REGION`                                              | `eu` (default) or `us`, matching the Mailgun account region                                   |
+   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                      | @BotFather and getUpdates                                                                     |
+   | `NEXT_PUBLIC_BASE_URL`                                        | `https://kupsiodstin.cz`                                                                      |
+   | `NEXT_PUBLIC_APP_ENV`                                         | `production`                                                                                  |
+   | `DRY_RUN`                                                     | `false` for production (`true` skips GoPay/Mailgun/Telegram sends)                            |
 
    Copy-paste ready (fill in the `<...>` placeholders):
 
@@ -95,7 +96,10 @@ What `disco.json` declares:
      ALLOWED_EMAILS='<comma-separated emails>' \
      COOKIE_SECRET="$(openssl rand -base64 48)" \
      CRON_SECRET="$(openssl rand -base64 32)" \
-     RESEND_API_KEY='<from resend.com dashboard>' \
+     MAILGUN_API_KEY='<from Mailgun → API security>' \
+     MAILGUN_DOMAIN='<your verified sending domain, e.g. mg.kupsiodstin.cz>' \
+     MAILGUN_FROM='Kup si Odstín <noreply@mg.kupsiodstin.cz>' \
+     MAILGUN_REGION='eu' \
      TELEGRAM_BOT_TOKEN='<from @BotFather>' \
      TELEGRAM_CHAT_ID='<from getUpdates>' \
      NEXT_PUBLIC_BASE_URL='https://kupsiodstin.cz' \
@@ -125,5 +129,5 @@ What `disco.json` declares:
 - [ ] `DRY_RUN=false` in Disco env
 - [ ] `GOPAY_SANDBOX=false`
 - [ ] Telegram chat is the right one and `@<your bot> /start` has been issued so it can DM you
-- [ ] Resend domain is verified (otherwise magic-link emails won't land)
+- [ ] Mailgun sending domain is verified (otherwise magic-link emails won't land — sandbox domain only delivers to verified recipients)
 - [x] `/api/healthz` is being polled by an external uptime monitor

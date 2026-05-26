@@ -23,7 +23,12 @@ process.env.COOKIE_SECRET =
   "00000000000000000000000000000000000000000000000000000000";
 process.env.CRON_SECRET =
   process.env.CRON_SECRET ?? "test-cron-secret-for-tests";
-process.env.RESEND_API_KEY = process.env.RESEND_API_KEY ?? "test-resend";
+process.env.MAILGUN_API_KEY = process.env.MAILGUN_API_KEY ?? "test-mailgun-key";
+process.env.MAILGUN_DOMAIN =
+  process.env.MAILGUN_DOMAIN ?? "sandbox-test.mailgun.org";
+process.env.MAILGUN_FROM =
+  process.env.MAILGUN_FROM ?? "test@sandbox-test.mailgun.org";
+process.env.MAILGUN_REGION = process.env.MAILGUN_REGION ?? "eu";
 process.env.NEXT_PUBLIC_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 process.env.NEXT_PUBLIC_APP_ENV = "development";

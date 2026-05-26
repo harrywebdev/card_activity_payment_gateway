@@ -70,7 +70,7 @@ export default function PrivacyPage() {
 
         <h3 className="h3">Komu to dáváme</h3>
         <p style={{ fontSize: 15, color: "var(--c0)" }}>
-          <b>GoPay s.r.o.</b> (platby) a <b>Resend</b> (rozesílání mailů).
+          <b>GoPay s.r.o.</b> (platby) a <b>Mailgun</b> (rozesílání mailů).
           Účetnímu jednou ročně souhrn. Nikomu jinému.
         </p>
 

@@ -33,7 +33,7 @@
 
 ### Auth
 
-- **Email magic-link only** (no passwords). Email submitted → token created → link sent via Resend → click verifies → session cookie issued.
+- **Email magic-link only** (no passwords). Email submitted → token created → link sent via Mailgun → click verifies → session cookie issued.
 - **Allowlist-gated**: only emails present in the `ALLOWED_EMAILS` env var (comma-separated string) can receive a magic link. Login form behaviour for non-allowlisted emails: **silent success** — show the same "check your inbox" confirmation regardless, but skip token creation and email send. Prevents email-enumeration leakage to anyone poking at the form.
 - **Sessions**: stateless, encrypted HTTP-only cookies via iron-session (`{userId, username, issuedAt}` sealed with `COOKIE_SECRET`). 30-day rolling expiry. No DB sessions table. Server-side revocation isn't possible without rotating `COOKIE_SECRET` (which signs everyone out) — acceptable at this scale.
 - **Username on first login**: when an allowlisted email completes magic-link verification for the first time, a unique 5-letter pseudo-Czech username is generated and stored on the `users` row.
@@ -104,7 +104,7 @@
 └────────────────────────────────────────────────────────────────────┘
             │
             ▼
-       GoPay API (REST + OAuth2)         Resend (magic-link email)
+       GoPay API (REST + OAuth2)         Mailgun (magic-link email)
        Telegram Bot API (notifications + deploy pings)
 ```
 
@@ -318,7 +318,7 @@ Used by:
 
 ### 6. Email (`src/lib/email.ts`)
 
-Resend wrapper for magic-link emails. Single template: "Click to sign in to Kup si Odstín" with a 15-min single-use link. Free tier (3k/mo) is overkill for an allowlist of ~5 emails.
+Mailgun HTTP-API wrapper (no SDK — just a Basic-auth POST to `{base}/v3/{domain}/messages`). Single template: "Click to sign in to Kup si Odstín" with a 15-min single-use link. Free tier (5k/mo) is plenty for an allowlist of a handful of emails.
 
 ### 7. Database — Prisma + better-sqlite3 adapter
 
@@ -353,7 +353,8 @@ No YAML. A single module reads `process.env` once at boot, validates with Zod 4,
 | `DATABASE_URL`                                                | Prisma connection string, e.g. `file:./data/dev.db` locally, `file:/app/data/gateway.db` in prod |
 | `GOPAY_CLIENT_ID`, `GOPAY_CLIENT_SECRET`, `GOPAY_MERCHANT_ID` | GoPay API credentials                                                                            |
 | `GOPAY_SANDBOX`                                               | `"true"` to hit sandbox, default `"false"`                                                       |
-| `RESEND_API_KEY`                                              | Magic-link email send                                                                            |
+| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM`           | Magic-link email send (Mailgun HTTP API)                                                         |
+| `MAILGUN_REGION`                                              | `eu` (default) or `us` — matches the Mailgun account region                                      |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                      | Notifications + deploy pings                                                                     |
 | `COOKIE_SECRET`                                               | iron-session encryption key (≥32 bytes)                                                          |
 | `ALLOWED_EMAILS`                                              | Comma-separated allowlist; normalised to lowercase + trimmed at boot                             |
@@ -416,7 +417,7 @@ kupsiodstin/
 │   │   ├── config.ts             # Zod-validated env + product constants
 │   │   ├── cron.ts               # isAuthorizedCron + heartbeat helper
 │   │   ├── auth.ts               # iron-session helpers, magic-link issue/verify
-│   │   ├── email.ts              # Resend wrapper
+│   │   ├── email.ts              # Mailgun HTTP API wrapper
 │   │   ├── telegram.ts           # sendTelegram(text)
 │   │   ├── gopay.ts              # OAuth2 + createPayment/createRecurrence/etc.
 │   │   ├── planner.ts            # schedule generation
@@ -574,7 +575,7 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 
 ### Phase 1: Foundation
 
-1. **Project scaffolding** — `package.json` (Next 16 / React 19 / Prisma 7 / Tailwind 4 / Zod 4 / iron-session / Resend / `server-only`), `tsconfig.json` (`@/*` → `./src/*`), `next.config.ts` (`output: "standalone"`), `postcss.config.mjs`, `.gitignore`, `eslint.config.mjs`
+1. **Project scaffolding** — `package.json` (Next 16 / React 19 / Prisma 7 / Tailwind 4 / Zod 4 / iron-session / `server-only`; Mailgun via plain `fetch`, no SDK), `tsconfig.json` (`@/*` → `./src/*`), `next.config.ts` (`output: "standalone"`), `postcss.config.mjs`, `.gitignore`, `eslint.config.mjs`
 2. **shadcn/ui** — `components.json` configured for Tailwind v4, `src/lib/utils.ts` (`cn` helper), `src/app/globals.css` with `@import "tailwindcss"` + `@theme` block + shadcn CSS variables
 3. **Prisma** — `prisma/schema.prisma` with all 9 models, `prisma.config.ts`, `src/lib/db.ts` (singleton + better-sqlite3 adapter, dev global cache), first migration via `prisma migrate dev --name init`
 4. **Config** — `src/lib/config.ts` reads `process.env`, validates with Zod 4 at module load, exports typed `config` + product constants
@@ -584,7 +585,7 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 
 ### Phase 2: Auth + Shop UI
 
-8. Magic-link auth — Resend integration, `ALLOWED_EMAILS` allowlist with silent-success on miss, `MagicLinkToken` lifecycle, iron-session cookie issue/verify, CVCVC username generation on first successful verification (`src/lib/username.ts`)
+8. Magic-link auth — Mailgun integration, `ALLOWED_EMAILS` allowlist with silent-success on miss, `MagicLinkToken` lifecycle, iron-session cookie issue/verify, CVCVC username generation on first successful verification (`src/lib/username.ts`)
 9. Color catalog + detail pages (read-only, owner shown as username)
 10. Dashboard skeleton (empty states)
 
@@ -622,7 +623,7 @@ Cron services use the `default` image (which has `scripts/` copied in), so they 
 1. **Unit tests**: planner distribution (correct count, spread, within window), instalment-amount rounding (sum equals `monthly_amount_czk`).
 2. **Auth tests**: magic-link token single-use, expiry enforcement, session cookie validation, allowlist behaviour (allowed email gets a token + email, non-allowlisted email gets the same UI response but no token row and no email send), username generation produces a unique 5-letter string and is stable across subsequent logins for the same email.
 3. **GoPay sandbox**: full subscribe → hosted-page payment → callback → first transaction → MIT recurrence on day N.
-4. **Dry-run mode**: full cycle with `dryRun: true` — scheduler plans, executor runs but skips actual GoPay calls, Telegram + Resend emails fire (to a sink address).
+4. **Dry-run mode**: full cycle with `dryRun: true` — scheduler plans, executor runs but skips actual GoPay calls, Telegram + Mailgun emails fire (to a sink address).
 5. **Healthcheck drills**: stop the Disco executor job, confirm `/healthz` flips to 503 within `executorStaleMinutes`; restart, confirm recovery.
 6. **Integration test**: enroll 1 real card via the live subscribe flow, let scheduler charge it a few times across 2-3 days, verify on bank statement.
 7. **Full rollout**: subscribe a real card to a real colour, let the planner+executor run for a month, sanity-check the GoPay merchant dashboard against `Transaction` rows.
@@ -645,7 +646,6 @@ Versions match the typo_edita reference project so we benefit from the same test
     "better-sqlite3": "^12.9.0",
     "@types/better-sqlite3": "^7.6.13",
     "iron-session": "^8",
-    "resend": "^6.12.2",
     "server-only": "^0.0.1",
     "zod": "^4.4.1",
     "class-variance-authority": "^0.7",
