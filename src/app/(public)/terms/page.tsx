@@ -47,7 +47,9 @@ export default function TermsPage() {
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
               Minimální měsíční částka je <b>1&nbsp;Kč</b>, maximální
               100&nbsp;000&nbsp;Kč. Počet splátek za měsíc 1–31. Strhává se
-              průběžně během měsíce přes GoPay.
+              průběžně během měsíce přes GoPay. Nejsme plátci DPH — uvedené
+              částky jsou konečné. Jedná se o digitální službu, žádné fyzické
+              doručení neprobíhá.
             </p>
           </section>
           <section>
@@ -82,12 +84,26 @@ export default function TermsPage() {
               nás kupuješ barvu, dělá to jenom <b>tobě dobře u srdce</b>.
             </p>
           </section>
+          <section>
+            <h3 className="h3">7. Reklamace</h3>
+            <p style={{ fontSize: 15, color: "var(--c0)" }}>
+              Něco nefunguje, jak má? Napiš na{" "}
+              <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a> nebo
+              pošli dopis na adresu Vrázova 983/1, 150 00 Praha 5. Reklamaci
+              vyřídíme do <b>30 dnů</b> od přijetí. Odpovíme stejným kanálem,
+              kterým nám napíšeš.
+            </p>
+          </section>
         </div>
 
         <hr className="dash" />
         <p className="muted center">
-          Provozuje Marek Burč. IČO: 75239990. <br />
-          Otázky: <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>
+          Provozuje Marek Burč · IČO: 75239990
+          <br />
+          Vrázova 983/1, Smíchov, 150 00 Praha 5
+          <br />
+          <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a> ·{" "}
+          <a href="tel:+420732676850">+420 732 676 850</a>
         </p>
         <p className="center">
           <Link className="btn" href="/">

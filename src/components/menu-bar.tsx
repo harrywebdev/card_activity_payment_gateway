@@ -8,6 +8,7 @@ const BASE_ITEMS: Item[] = [
   { label: "Katalog", hot: "K", href: "/colors" },
   { label: "Pravidla", hot: "P", href: "/terms" },
   { label: "Soukromí", hot: "S", href: "/privacy" },
+  { label: "Kontakt", hot: "o", href: "/contact" },
 ];
 
 function highlight(label: string, hot: string) {
