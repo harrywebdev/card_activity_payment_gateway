@@ -83,6 +83,26 @@ What `disco.json` declares:
    | `NEXT_PUBLIC_APP_ENV`                                         | `production`                                                      |
    | `DRY_RUN`                                                     | `false` for production (`true` skips GoPay/Resend/Telegram sends) |
 
+   Copy-paste ready (fill in the `<...>` placeholders):
+
+   ```bash
+   disco env:set \
+     DATABASE_URL='file:/app/data/gateway.db' \
+     GOPAY_CLIENT_ID='<from GoPay merchant dashboard>' \
+     GOPAY_CLIENT_SECRET='<from GoPay merchant dashboard>' \
+     GOPAY_MERCHANT_ID='<from GoPay merchant dashboard>' \
+     GOPAY_SANDBOX='false' \
+     ALLOWED_EMAILS='<comma-separated emails>' \
+     COOKIE_SECRET="$(openssl rand -base64 48)" \
+     CRON_SECRET="$(openssl rand -base64 32)" \
+     RESEND_API_KEY='<from resend.com dashboard>' \
+     TELEGRAM_BOT_TOKEN='<from @BotFather>' \
+     TELEGRAM_CHAT_ID='<from getUpdates>' \
+     NEXT_PUBLIC_BASE_URL='https://kupsiodstin.cz' \
+     NEXT_PUBLIC_APP_ENV='production' \
+     DRY_RUN='false'
+   ```
+
 4. **Attach the domain** `kupsiodstin.cz` to the `web` service. Disco handles the certificate via Let's Encrypt.
 5. **Deploy.** The first deploy will create the SQLite DB on the volume via `prisma migrate deploy`.
 6. **Seed the colour catalogue** (one-shot, idempotent — safe to re-run):
