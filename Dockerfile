@@ -20,7 +20,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_APP_ENV=production
 ARG DISCO_DEPLOYMENT_NUMBER
 RUN --mount=type=secret,id=.env \
-  set -a && . /run/secrets/.env && set +a && npm run build
+  while IFS= read -r line || [ -n "$line" ]; do \
+    case "$line" in \#*|'') continue ;; *=*) export "$line" ;; esac; \
+  done < /run/secrets/.env && npm run build
 
 # --- Runner ---
 FROM base AS runner
