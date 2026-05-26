@@ -88,13 +88,9 @@ export default function TermsPage() {
             <h3 className="h3">7. Opakované platby</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
               Založením předplatného souhlasíš s&nbsp;opakovaným strhováním
-              částky z&nbsp;uložené karty. Údaje o&nbsp;kartě ukládá výhradně{" "}
-              <b>GoPay s.r.o.</b> v&nbsp;souladu se standardem PCI DSS Level 1 —
-              my k&nbsp;nim nemáme přístup. Částka i&nbsp;frekvence jsou fixní a
-              odpovídají parametrům, které sis zvolil/a při založení. Předplatné
-              trvá do zrušení. Dokumentaci o&nbsp;platbách uchováváme minimálně
-              12 měsíců po ukončení. Zrušit můžeš kdykoliv na{" "}
-              <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>.
+              částky z&nbsp;uložené karty. Podrobné podmínky opakovaných plateb
+              najdeš na samostatné stránce{" "}
+              <Link href="/recurring">Opakované platby</Link>.
             </p>
           </section>
           <section>

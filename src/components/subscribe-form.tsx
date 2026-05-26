@@ -254,6 +254,10 @@ export function SubscribeForm({
             vědomí{" "}
             <Link href="/terms" target="_blank">
               pravidla
+            </Link>{" "}
+            a{" "}
+            <Link href="/recurring" target="_blank">
+              podmínky opakovaných plateb
             </Link>
             .
           </span>
