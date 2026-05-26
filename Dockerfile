@@ -10,6 +10,8 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# DISCO_DEPLOYMENT_NUMBER changes each deploy, busting the COPY cache
+ARG DISCO_DEPLOYMENT_NUMBER
 COPY . .
 
 RUN npx prisma generate
@@ -18,7 +20,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # disco env vars are available as Docker build secrets at /run/secrets/.env
 # NEXT_PUBLIC_* vars must be set at build time (Next.js inlines them into the client bundle)
 ARG NEXT_PUBLIC_APP_ENV=production
-ARG DISCO_DEPLOYMENT_NUMBER
 RUN --mount=type=secret,id=.env \
   env $(cat /run/secrets/.env | xargs) \
   npm run build
