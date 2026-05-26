@@ -111,7 +111,14 @@ What `disco.json` declares:
    disco run "sh -c 'wget -qO- --post-data= --header=\"Authorization: Bearer \$CRON_SECRET\" http://web:3000/api/admin/seed-colors'" --project kupsiodstin --service web
    ```
 
-7. **Point UptimeRobot** (or Better Stack / whatever you use) at `https://kupsiodstin.cz/api/healthz`. The endpoint returns 200 only when every cron's heartbeat is fresher than its threshold (executor 25 min, planner 32 days, daily-summary 25 h). Any breakage in the Disco-fires → script → wget → route → DB-write chain pages you.
+7. **Trigger planner and daily-summary** once to seed their heartbeats (they run on monthly/daily schedules, so they won't have fired yet after a fresh deploy):
+
+   ```bash
+   disco run "sh -c 'wget -qO- --post-data= --header=\"Authorization: Bearer \$CRON_SECRET\" http://web:3000/api/cron/plan-month'" --project kupsiodstin --service web
+   disco run "sh -c 'wget -qO- --post-data= --header=\"Authorization: Bearer \$CRON_SECRET\" http://web:3000/api/cron/daily-summary'" --project kupsiodstin --service web
+   ```
+
+8. **Point UptimeRobot** (or Better Stack / whatever you use) at `https://kupsiodstin.cz/api/healthz`. The endpoint returns 200 only when every cron's heartbeat is fresher than its threshold (executor 25 min, planner 32 days, daily-summary 25 h). Any breakage in the Disco-fires → script → wget → route → DB-write chain pages you.
 
 ### Production checklist
 
@@ -119,4 +126,4 @@ What `disco.json` declares:
 - [ ] `GOPAY_SANDBOX=false`
 - [ ] Telegram chat is the right one and `@<your bot> /start` has been issued so it can DM you
 - [ ] Resend domain is verified (otherwise magic-link emails won't land)
-- [ ] `/api/healthz` is being polled by an external uptime monitor
+- [x] `/api/healthz` is being polled by an external uptime monitor
