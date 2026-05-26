@@ -30,7 +30,7 @@ export default function TermsPage() {
         <p className="lede">
           Žádný 14stránkový PDF v právničtině.
           <br />
-          Tohle ti přečteš za 90 sekund.
+          Tohle si přečteš za 90 sekund.
         </p>
 
         <div className="stack-loose">
@@ -86,7 +86,7 @@ export default function TermsPage() {
 
         <hr className="dash" />
         <p className="muted center">
-          Provozuje <b>Kup si Odstín</b>. IČO doplníme, až bude. <br />
+          Provozuje Marek Burč. IČO: 75239990. <br />
           Otázky: <a href="mailto:ahoj@kupsiodstin.cz">ahoj@kupsiodstin.cz</a>
         </p>
         <p className="center">
