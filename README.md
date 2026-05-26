@@ -107,10 +107,8 @@ What `disco.json` declares:
 5. **Deploy.** The first deploy will create the SQLite DB on the volume via `prisma migrate deploy`.
 6. **Seed the colour catalogue** (one-shot, idempotent — safe to re-run):
 
-   ```sh
-   curl -sS -X POST \
-     -H "Authorization: Bearer $CRON_SECRET" \
-     https://kupsiodstin.cz/api/admin/seed-colors
+   ```bash
+   disco run "sh -c 'wget -qO- --post-data= --header=\"Authorization: Bearer \$CRON_SECRET\" http://web:3000/api/admin/seed-colors'" --project kupsiodstin --service web
    ```
 
 7. **Point UptimeRobot** (or Better Stack / whatever you use) at `https://kupsiodstin.cz/api/healthz`. The endpoint returns 200 only when every cron's heartbeat is fresher than its threshold (executor 25 min, planner 32 days, daily-summary 25 h). Any breakage in the Disco-fires → script → wget → route → DB-write chain pages you.
