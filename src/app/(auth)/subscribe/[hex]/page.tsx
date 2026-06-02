@@ -48,11 +48,11 @@ export default async function SubscribePage({
         </p>
 
         <h1 className="h1">
-          Tvoje cena. <span className="em">Tvoje tempo.</span>
+          Tvoje cena. <span className="em">Tvoje rozhodnutí.</span>
         </h1>
         <p className="lede">
           Není to fixní pricing. <b>Ty rozhodneš</b>, kolik ti to za to stojí —
-          <br />a do kolika splátek to chceš rozložit.
+          <br />a platí se to jednou měsíčně přes GoPay.
         </p>
 
         <div className="grid-2">

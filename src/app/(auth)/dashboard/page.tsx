@@ -8,22 +8,33 @@ export const metadata = {
   title: "Můj účet | Kup si Odstín",
 };
 
-function ProgressBar({ done, total }: { done: number; total: number }) {
-  const filled = "█".repeat(Math.max(0, Math.min(total, done)));
-  const empty = "░".repeat(Math.max(0, total - done));
-  return (
-    <pre
-      style={{
-        margin: 0,
-        fontSize: 13,
-        color: "var(--c0)",
-        fontFamily: "var(--font-mono)",
-        lineHeight: 1.05,
-      }}
-    >
-      {`[${filled}${empty}] ${done}/${total}`}
-    </pre>
-  );
+function statusLabel(status: string | undefined): string {
+  switch (status) {
+    case "succeeded":
+      return "STRŽENO";
+    case "failed":
+      return "SELHALO";
+    case "in_progress":
+      return "BĚŽÍ";
+    case "pending":
+      return "ČEKÁ";
+    default:
+      return "—";
+  }
+}
+
+function statusTag(status: string | undefined): string {
+  switch (status) {
+    case "succeeded":
+      return "ok";
+    case "failed":
+      return "err";
+    case "in_progress":
+    case "pending":
+      return "warn";
+    default:
+      return "";
+  }
 }
 
 export default async function DashboardPage({
@@ -40,15 +51,16 @@ export default async function DashboardPage({
     select: { email: true, createdAt: true },
   });
 
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth() + 1;
+
   const subscriptions = await prisma.subscription.findMany({
     where: { userId: user.id, status: { in: ["active", "pending"] } },
     include: {
       color: true,
-      plans: {
-        where: {
-          year: new Date().getFullYear(),
-          month: new Date().getMonth() + 1,
-        },
+      scheduledPayments: {
+        where: { year: thisYear, month: thisMonth },
         take: 1,
       },
     },
@@ -62,7 +74,6 @@ export default async function DashboardPage({
   const activeCount = subscriptions.filter((s) => s.status === "active").length;
 
   // Next charge — next 1st of month
-  const now = new Date();
   const nextFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const daysToNext = Math.ceil(
     (nextFirst.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
@@ -84,8 +95,7 @@ export default async function DashboardPage({
               ── PŘIPSÁNO ────────────────────────────────
             </div>
             <div style={{ padding: "14px 18px", fontSize: 15 }}>
-              ✅ Předplatné je aktivní. První splátka prošla, ostatní jsou
-              naplánované.
+              ✅ Předplatné je aktivní. První měsíční platba prošla.
             </div>
           </div>
         )}
@@ -212,10 +222,7 @@ export default async function DashboardPage({
             </thead>
             <tbody>
               {subscriptions.map((sub) => {
-                const plan = sub.plans[0];
-                const done = plan?.completedInstalments ?? 0;
-                const total =
-                  plan?.targetInstalments ?? sub.instalmentsPerMonth;
+                const thisMonthCharge = sub.scheduledPayments[0];
                 return (
                   <tr
                     key={sub.id}
@@ -246,7 +253,11 @@ export default async function DashboardPage({
                     </td>
                     <td style={{ padding: "10px" }}>{sub.color.hex}</td>
                     <td style={{ padding: "10px" }}>
-                      <ProgressBar done={done} total={total} />
+                      <span
+                        className={"tag " + statusTag(thisMonthCharge?.status)}
+                      >
+                        {statusLabel(thisMonthCharge?.status)}
+                      </span>
                     </td>
                     <td style={{ padding: "10px", textAlign: "right" }}>
                       <b>{formatCzk(sub.monthlyAmountCzk)}</b>
@@ -282,11 +293,9 @@ export default async function DashboardPage({
           <div>
             <h3 className="h3">Platby & doklady</h3>
             <p style={{ fontSize: 15, color: "var(--c0)", margin: 0 }}>
-              Strhujeme přes GoPay průběžně během měsíce,
+              Jednou měsíčně strhneme přes GoPay z uložené karty.
               <br />
-              splátky jsou rozprostřené přirozeně.
-              <br />
-              Když platba selže 3× po sobě, dáme vědět.
+              Když platba selže 3× po sobě, dáme vědět mailem.
             </p>
           </div>
           <div>

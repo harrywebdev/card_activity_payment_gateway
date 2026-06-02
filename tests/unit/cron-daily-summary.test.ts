@@ -35,7 +35,7 @@ describe("POST /api/cron/daily-summary", () => {
   afterEach(() => vi.useRealTimers());
 
   it("posts a monthly recap to Telegram on the 1st of the month", async () => {
-    // Set up: a subscription that finished its plan last month (May 2026)
+    // Set up: a subscription whose May 2026 charge succeeded.
     const user = await prisma.user.create({
       data: { email: "recap@example.com", username: "vumin" },
     });
@@ -47,42 +47,30 @@ describe("POST /api/cron/daily-summary", () => {
         userId: user.id,
         colorId: color.id,
         monthlyAmountCzk: 100,
-        instalmentsPerMonth: 10,
         status: "active",
         startedAt: new Date(2026, 4, 1),
       },
     });
-    const plan = await prisma.subscriptionPlan.create({
+    const sp = await prisma.scheduledPayment.create({
       data: {
         subscriptionId: sub.id,
         year: 2026,
         month: 5,
-        targetInstalments: 10,
-        completedInstalments: 10,
-        status: "completed",
+        amountCzk: 100,
+        scheduledAt: new Date(2026, 4, 15, 12, 0, 0),
+        status: "succeeded",
+        attempts: 1,
       },
     });
-    // 10 successful ScheduledPayments with Transactions for the recap to count.
-    for (let i = 0; i < 10; i++) {
-      const sp = await prisma.scheduledPayment.create({
-        data: {
-          subscriptionPlanId: plan.id,
-          amountCzk: 10,
-          scheduledAt: new Date(2026, 4, 5 + i, 12, 0, 0),
-          status: "succeeded",
-          attempts: 1,
-        },
-      });
-      await prisma.transaction.create({
-        data: {
-          scheduledPaymentId: sp.id,
-          amountCzk: 10,
-          status: "succeeded",
-          gopayPaymentId: `t${i}`,
-          executedAt: new Date(2026, 4, 5 + i, 12, 0, 0),
-        },
-      });
-    }
+    await prisma.transaction.create({
+      data: {
+        scheduledPaymentId: sp.id,
+        amountCzk: 100,
+        status: "succeeded",
+        gopayPaymentId: "tx1",
+        executedAt: new Date(2026, 4, 15, 12, 0, 0),
+      },
+    });
 
     // Spy + force "now" to 2026-06-01 21:00 so the day-1 branch fires.
     const sent: string[] = [];
@@ -105,8 +93,8 @@ describe("POST /api/cron/daily-summary", () => {
     // Daily (active sub, may have nothing today) + monthly recap (1st)
     const recap = sent.find((s) => s.includes("Měsíční rekapitulace"));
     expect(recap).toBeTruthy();
-    expect(recap).toContain("10/10");
     expect(recap).toContain("černá");
+    expect(recap).toContain("100");
 
     spy.mockRestore();
   });
@@ -136,26 +124,17 @@ describe("POST /api/cron/daily-summary", () => {
         userId: user.id,
         colorId: color.id,
         monthlyAmountCzk: 100,
-        instalmentsPerMonth: 10,
         status: "active",
         startedAt: new Date(),
       },
     });
     const now = new Date();
-    const plan = await prisma.subscriptionPlan.create({
+    const sp = await prisma.scheduledPayment.create({
       data: {
         subscriptionId: sub.id,
         year: now.getFullYear(),
         month: now.getMonth() + 1,
-        targetInstalments: 10,
-        completedInstalments: 2,
-        status: "active",
-      },
-    });
-    const sp = await prisma.scheduledPayment.create({
-      data: {
-        subscriptionPlanId: plan.id,
-        amountCzk: 10,
+        amountCzk: 100,
         scheduledAt: new Date(Date.now() - 60_000),
         status: "succeeded",
         attempts: 1,
@@ -164,26 +143,18 @@ describe("POST /api/cron/daily-summary", () => {
     await prisma.transaction.create({
       data: {
         scheduledPaymentId: sp.id,
-        amountCzk: 10,
+        amountCzk: 100,
         status: "succeeded",
         gopayPaymentId: "abc",
         executedAt: new Date(),
       },
     });
-    // A failed transaction earlier today
-    const sp2 = await prisma.scheduledPayment.create({
-      data: {
-        subscriptionPlanId: plan.id,
-        amountCzk: 10,
-        scheduledAt: new Date(Date.now() - 120_000),
-        status: "failed",
-        attempts: 3,
-      },
-    });
+    // A failed transaction earlier today, parented to the same row (it's
+    // the previous attempt that ultimately succeeded).
     await prisma.transaction.create({
       data: {
-        scheduledPaymentId: sp2.id,
-        amountCzk: 10,
+        scheduledPaymentId: sp.id,
+        amountCzk: 100,
         status: "failed",
         error: "test",
         executedAt: new Date(),

@@ -44,19 +44,17 @@ export default function RecurringPage() {
           <section>
             <h3 className="h3">Částka</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Měsíční částku si volíš sám/sama při založení (min. 1 Kč, max.
-              100 000 Kč). Částka je <b>fixní</b> — neměníme ji bez tvého
-              vědomí. Maximální výše jedné splátky odpovídá celkové měsíční
-              částce dělené počtem splátek, zaokrouhleno nahoru na celé koruny.
+              Měsíční částku si volíš sám/sama při založení (min. 10 Kč, max.
+              100 Kč). Částka je <b>fixní</b> — neměníme ji bez tvého vědomí.
+              Maximální výše jedné platby odpovídá zvolené měsíční částce.
             </p>
           </section>
 
           <section>
             <h3 className="h3">Frekvence</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Měsíční částka se rozdělí do 1–31 splátek (volíš při založení).
-              Splátky se rovnoměrně rozprostřou napříč měsícem. Frekvence je{" "}
-              <b>fixní</b>.
+              Jedna platba měsíčně. Frekvence je <b>fixní</b> — 1× za měsíc,
+              po celou dobu trvání předplatného.
             </p>
           </section>
 
@@ -64,7 +62,8 @@ export default function RecurringPage() {
             <h3 className="h3">Trvání</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
               Předplatné běží <b>do zrušení</b>. Žádná minimální doba, žádná
-              výpovědní lhůta.
+              výpovědní lhůta. Kdykoliv můžeš předplatné zrušit bez jakýchkoli
+              dalších závazků.
             </p>
           </section>
 

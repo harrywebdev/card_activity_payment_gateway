@@ -20,7 +20,7 @@ export default function TermsPage() {
         >
           {`     ╔══════════════════════════════════════════════════╗
      ║  PRAVIDLA.TXT — Co si přesně kupuješ             ║
-     ║  Aktualizováno: 25. 5. 2026                      ║
+     ║  Aktualizováno: 2. 6. 2026                       ║
      ╚══════════════════════════════════════════════════╝`}
         </pre>
 
@@ -43,13 +43,12 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h3 className="h3">2. Cenu a splátky určuješ ty</h3>
+            <h3 className="h3">2. Cenu si určuješ ty</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Minimální měsíční částka je <b>1&nbsp;Kč</b>, maximální
-              100&nbsp;000&nbsp;Kč. Počet splátek za měsíc 1–31. Strhává se
-              průběžně během měsíce přes GoPay. Nejsme plátci DPH — uvedené
-              částky jsou konečné. Jedná se o digitální službu, žádné fyzické
-              doručení neprobíhá.
+              Minimální měsíční částka je <b>10&nbsp;Kč</b>, maximální
+              100&nbsp;Kč. Jedna platba měsíčně přes GoPay. Nejsme plátci DPH —
+              uvedené částky jsou konečné. Jedná se o digitální službu, žádné
+              fyzické doručení neprobíhá.
             </p>
           </section>
           <section>
@@ -87,9 +86,9 @@ export default function TermsPage() {
           <section>
             <h3 className="h3">7. Opakované platby</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Založením předplatného souhlasíš s&nbsp;opakovaným strhováním
-              částky z&nbsp;uložené karty. Podrobné podmínky opakovaných plateb
-              najdeš na samostatné stránce{" "}
+              Založením předplatného souhlasíš s&nbsp;opakovaným měsíčním
+              strháváním částky z&nbsp;uložené karty. Podrobné podmínky
+              opakovaných plateb najdeš na samostatné stránce{" "}
               <Link href="/recurring">Opakované platby</Link>.
             </p>
           </section>

@@ -5,8 +5,8 @@ import { createRecurrence } from "@/lib/gopay";
 import { EXECUTOR } from "@/lib/config";
 import { sendTelegram } from "@/lib/telegram";
 import {
-  tplInstalmentSuccess,
-  tplInstalmentFailure,
+  tplChargeSuccess,
+  tplChargeFailure,
   tplExecutorError,
 } from "@/lib/telegram-templates";
 
@@ -41,12 +41,8 @@ export async function POST(req: Request) {
     const due = await prisma.scheduledPayment.findMany({
       where: { status: "pending", scheduledAt: { lte: now } },
       include: {
-        subscriptionPlan: {
-          include: {
-            subscription: {
-              include: { color: true, user: true, paymentMethod: true },
-            },
-          },
+        subscription: {
+          include: { color: true, user: true, paymentMethod: true },
         },
       },
       orderBy: { scheduledAt: "asc" },
@@ -62,7 +58,7 @@ export async function POST(req: Request) {
       if (claim.count === 0) continue;
       processed++;
 
-      const sub = sp.subscriptionPlan.subscription;
+      const sub = sp.subscription;
       const pm = sub.paymentMethod;
 
       // Defensive: a pending ScheduledPayment without a saved PaymentMethod
@@ -80,8 +76,9 @@ export async function POST(req: Request) {
         continue;
       }
 
-      const orderNumber = `sub_${sub.id}_inst_${sp.subscriptionPlan.completedInstalments + 1}_of_${sub.instalmentsPerMonth}`;
-      const orderDescription = `${sub.color.name} (${sub.color.hex}) — splátka ${sp.subscriptionPlan.completedInstalments + 1}/${sub.instalmentsPerMonth}`;
+      const monthLabel = `${String(sp.month).padStart(2, "0")}/${sp.year}`;
+      const orderNumber = `sub_${sub.id}_${sp.year}_${String(sp.month).padStart(2, "0")}`;
+      const orderDescription = `${sub.color.name} (${sub.color.hex}) — předplatné ${monthLabel}`;
 
       try {
         const recurrence = await createRecurrence(pm.gopayPaymentId, {
@@ -109,22 +106,17 @@ export async function POST(req: Request) {
               executedAt: new Date(),
             },
           });
-          await tx.subscriptionPlan.update({
-            where: { id: sp.subscriptionPlanId },
-            data: { completedInstalments: { increment: 1 } },
-          });
         });
 
         succeeded++;
 
         try {
           await sendTelegram(
-            tplInstalmentSuccess({
+            tplChargeSuccess({
               color: sub.color,
               username: sub.user.username,
               amountCzk: sp.amountCzk,
-              instalmentNumber: sp.subscriptionPlan.completedInstalments + 1,
-              instalmentsPerMonth: sub.instalmentsPerMonth,
+              monthLabel,
             }),
           );
         } catch (telegramErr) {
@@ -157,7 +149,7 @@ export async function POST(req: Request) {
 
           try {
             await sendTelegram(
-              tplInstalmentFailure({
+              tplChargeFailure({
                 color: sub.color,
                 username: sub.user.username,
                 amountCzk: sp.amountCzk,

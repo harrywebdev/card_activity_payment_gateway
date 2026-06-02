@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getPaymentStatus } from "@/lib/gopay";
-import { planSubscriptionForMonth, splitAmount } from "@/lib/planner";
 import { sendTelegram } from "@/lib/telegram";
 import { tplActivation } from "@/lib/telegram-templates";
 
@@ -101,12 +100,8 @@ async function handleInitialEnrolmentNotification(
 
   const lastFour = extractLastFour(status.payer?.payment_card?.card_number);
   const bankName = status.payer?.payment_card?.issuer_bank ?? null;
-  const firstAmounts = splitAmount(
-    subscription.monthlyAmountCzk,
-    subscription.instalmentsPerMonth,
-  );
-  const firstAmount = firstAmounts[0];
 
+  const now = new Date();
   const result = await prisma.$transaction(async (tx) => {
     const paymentMethod = await tx.paymentMethod.create({
       data: {
@@ -122,7 +117,7 @@ async function handleInitialEnrolmentNotification(
       where: { id: subscription.id },
       data: {
         status: "active",
-        startedAt: new Date(),
+        startedAt: now,
         paymentMethodId: paymentMethod.id,
       },
     });
@@ -132,38 +127,33 @@ async function handleInitialEnrolmentNotification(
       data: { currentSubscriptionId: subscription.id },
     });
 
-    return { paymentMethodId: paymentMethod.id };
-  });
+    // Record this month's charge — the initial payment via GoPay's hosted
+    // page covers the current month, so we mark its ScheduledPayment as
+    // succeeded straight away and parent the Transaction onto it. The
+    // monthly planner will schedule next month's charge on the 1st.
+    const sp = await tx.scheduledPayment.create({
+      data: {
+        subscriptionId: subscription.id,
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        amountCzk: subscription.monthlyAmountCzk,
+        scheduledAt: now,
+        status: "succeeded",
+        attempts: 1,
+      },
+    });
 
-  // Plan the remaining instalments for this month. The initial payment
-  // counts as instalment 1, so alreadyCompleted=1.
-  const { planId } = await planSubscriptionForMonth({
-    subscriptionId: subscription.id,
-    monthlyAmountCzk: subscription.monthlyAmountCzk,
-    instalmentsPerMonth: subscription.instalmentsPerMonth,
-    alreadyCompleted: 1,
-  });
+    await tx.transaction.create({
+      data: {
+        scheduledPaymentId: sp.id,
+        amountCzk: subscription.monthlyAmountCzk,
+        status: "succeeded",
+        gopayPaymentId,
+        executedAt: now,
+      },
+    });
 
-  // Synthesise a "succeeded at creation" ScheduledPayment to parent the
-  // first Transaction onto.
-  const firstScheduled = await prisma.scheduledPayment.create({
-    data: {
-      subscriptionPlanId: planId,
-      amountCzk: firstAmount,
-      scheduledAt: new Date(),
-      status: "succeeded",
-      attempts: 1,
-    },
-  });
-
-  await prisma.transaction.create({
-    data: {
-      scheduledPaymentId: firstScheduled.id,
-      amountCzk: firstAmount,
-      status: "succeeded",
-      gopayPaymentId,
-      executedAt: new Date(),
-    },
+    return { paymentMethodId: paymentMethod.id, scheduledPaymentId: sp.id };
   });
 
   try {
@@ -172,8 +162,6 @@ async function handleInitialEnrolmentNotification(
         color: subscription.color,
         username: subscription.user.username,
         monthlyAmountCzk: subscription.monthlyAmountCzk,
-        instalmentsPerMonth: subscription.instalmentsPerMonth,
-        firstAmountCzk: firstAmount,
       }),
     );
   } catch (e) {
@@ -185,7 +173,7 @@ async function handleInitialEnrolmentNotification(
     kind: "activated",
     subscriptionId: subscription.id,
     paymentMethodId: result.paymentMethodId,
-    planId,
+    scheduledPaymentId: result.scheduledPaymentId,
   });
 }
 

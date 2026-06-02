@@ -39,7 +39,7 @@ export default async function ColorDetail({
   // Is THIS user the owner?
   const isMine = user && owner ? user.username === owner.username : false;
 
-  // First instalment date (if owned) — looked up from the subscription
+  // Owner start date — looked up from the subscription
   let ownerStartDate: Date | null = null;
   if (color.currentSubscriptionId) {
     const sub = await prisma.subscription.findUnique({
@@ -208,7 +208,7 @@ export default async function ColorDetail({
                     Tahle barva je{" "}
                     <b style={{ color: "var(--c4)" }}>volná k převzetí</b>.
                     <br />
-                    Cenu i splátky si nastavíš v dalším kroku.
+                    Cenu si nastavíš v dalším kroku.
                   </p>
                 )}
               </div>
@@ -263,9 +263,9 @@ export default async function ColorDetail({
           <div>
             <h3 className="h3">A je v tom nějaký háček?</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Ne. Cenu i délku splácení si dáš sám.
+              Ne. Cenu si dáš sám, platíš jednou měsíčně.
               <br />
-              Když přestaneš platit, barva se uvolní.
+              Zrušit můžeš kdykoliv — barva se uvolní.
               <br />
               Žádný papír, žádný právník, <b>žádný DRM</b>.
             </p>

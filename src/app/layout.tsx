@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Kup si Odstín — vlastni jednu barvu",
   description:
-    "Vyber si jeden ze 16 odstínů z CGA palety a vlastni ho. Splácej v měsíčních splátkách.",
+    "Vyber si jeden ze 16 odstínů z CGA palety a vlastni ho. Měsíční předplatné, zrušitelné kdykoliv.",
 };
 
 export default function RootLayout({

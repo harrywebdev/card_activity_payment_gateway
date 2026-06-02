@@ -15,13 +15,12 @@ import {
  * Triggered by Disco at 21:00 every day.
  *
  * Always:
- *   - Computes today's per-subscription progress.
+ *   - Computes today's per-subscription charges (success/failure).
  *   - If any active subscription exists, posts a daily digest to Telegram.
  *
  * On the 1st of the month:
  *   - Also posts a separate "Monthly recap" message looking back at the
- *     previous month's totals per subscription (target vs. completed,
- *     CZK charged).
+ *     previous month's outcomes per subscription (charged or failed).
  *
  * Heartbeat is written even if nothing happened, so /api/healthz can
  * vouch for the cron chain regardless.
@@ -46,7 +45,7 @@ export async function POST(req: Request) {
       include: {
         color: true,
         user: { select: { username: true } },
-        plans: {
+        scheduledPayments: {
           where: { year: thisYear, month: thisMonth },
           take: 1,
         },
@@ -58,15 +57,13 @@ export async function POST(req: Request) {
     let dailyFailedTotal = 0;
 
     for (const sub of activeSubs) {
-      const plan = sub.plans[0];
-      const completedThisMonth = plan?.completedInstalments ?? 0;
-      const targetThisMonth =
-        plan?.targetInstalments ?? sub.instalmentsPerMonth;
+      const thisMonthRow = sub.scheduledPayments[0];
+      const thisMonthStatus = thisMonthRow?.status ?? "missing";
 
       const todayTx = await prisma.transaction.findMany({
         where: {
           executedAt: { gte: dayStart, lt: dayEnd },
-          scheduledPayment: { subscriptionPlan: { subscriptionId: sub.id } },
+          scheduledPayment: { subscriptionId: sub.id },
         },
         select: { status: true, amountCzk: true },
       });
@@ -87,8 +84,7 @@ export async function POST(req: Request) {
         todaySuccess,
         todayFailed: todayFail,
         todayAmountCzk: todayAmount,
-        completedThisMonth,
-        targetThisMonth,
+        thisMonthStatus,
       });
     }
 
@@ -113,7 +109,7 @@ export async function POST(req: Request) {
       const lastYear = lastMonthDate.getFullYear();
       const lastMonth = lastMonthDate.getMonth() + 1;
 
-      const lastMonthPlans = await prisma.subscriptionPlan.findMany({
+      const lastMonthCharges = await prisma.scheduledPayment.findMany({
         where: { year: lastYear, month: lastMonth },
         include: {
           subscription: {
@@ -122,27 +118,19 @@ export async function POST(req: Request) {
               user: { select: { username: true } },
             },
           },
-          scheduledPayments: {
-            include: {
-              transactions: { where: { status: "succeeded" } },
-            },
-          },
+          transactions: { where: { status: "succeeded" } },
         },
       });
 
-      const monthProgress: MonthSubProgress[] = lastMonthPlans.map((plan) => {
-        const succeededTx = plan.scheduledPayments.flatMap(
-          (sp) => sp.transactions,
-        );
-        const amount = succeededTx.reduce((a, t) => a + t.amountCzk, 0);
+      const monthProgress: MonthSubProgress[] = lastMonthCharges.map((sp) => {
+        const amount = sp.transactions.reduce((a, t) => a + t.amountCzk, 0);
         return {
           color: {
-            name: plan.subscription.color.name,
-            hex: plan.subscription.color.hex,
+            name: sp.subscription.color.name,
+            hex: sp.subscription.color.hex,
           },
-          username: plan.subscription.user.username,
-          completed: plan.completedInstalments,
-          target: plan.targetInstalments,
+          username: sp.subscription.user.username,
+          status: sp.status,
           amountCzk: amount,
         };
       });

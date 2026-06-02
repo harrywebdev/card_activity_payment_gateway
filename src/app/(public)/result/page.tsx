@@ -20,16 +20,10 @@ export default async function ResultPage({
     where: { id: subId },
     include: {
       color: true,
-      plans: {
-        orderBy: { createdAt: "desc" },
+      scheduledPayments: {
+        orderBy: { scheduledAt: "asc" },
         take: 1,
-        include: {
-          scheduledPayments: {
-            include: {
-              transactions: { where: { status: "succeeded" } },
-            },
-          },
-        },
+        include: { transactions: { where: { status: "succeeded" } } },
       },
     },
   });
@@ -37,10 +31,10 @@ export default async function ResultPage({
 
   const ok = subscription.status === "active";
 
-  // Find the first transaction (the initial one)
-  const firstTx = subscription.plans[0]?.scheduledPayments
-    .flatMap((sp) => sp.transactions)
-    .find((t) => !!t);
+  // The initial payment is the first ScheduledPayment's first Transaction.
+  const firstTx = subscription.scheduledPayments[0]?.transactions.find(
+    (t) => !!t,
+  );
 
   const ink = inkFor(subscription.color.hex);
 
@@ -77,7 +71,7 @@ export default async function ResultPage({
               </span>
             </h1>
             <p className="lede">
-              GoPay strhlo první splátku.{" "}
+              GoPay strhlo první měsíční platbu.{" "}
               <b style={{ textTransform: "capitalize" }}>
                 {subscription.color.name}
               </b>{" "}
@@ -127,14 +121,14 @@ export default async function ResultPage({
                     </td>
                   </tr>
                   <tr>
-                    <td>Rozprostřeno do</td>
-                    <td>{subscription.instalmentsPerMonth} splátek</td>
-                  </tr>
-                  <tr>
-                    <td>První splátka</td>
+                    <td>První platba</td>
                     <td>
                       <b>{firstTx ? formatCzk(firstTx.amountCzk) : "—"}</b>
                     </td>
+                  </tr>
+                  <tr>
+                    <td>Další platba</td>
+                    <td>příští měsíc, automaticky z uložené karty</td>
                   </tr>
                   <tr>
                     <td>Doklad</td>

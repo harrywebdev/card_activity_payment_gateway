@@ -67,7 +67,6 @@ model Subscription {
   paymentMethodId       String?
   paymentMethod         PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
   monthlyAmountCzk      Int
-  instalmentsPerMonth   Int
   status                String    @default("pending") // pending | active | cancelled
   // Set right after the initial GoPay createPayment call. Lets the webhook
   // find the pending subscription by payment id. Becomes the recurrence
@@ -80,34 +79,19 @@ model Subscription {
   // Back-relation for Color.currentSubscription (one color → one current sub)
   currentOnColor Color? @relation("CurrentOwner")
 
-  plans SubscriptionPlan[]
+  scheduledPayments ScheduledPayment[]
 
   @@index([userId])
   @@index([colorId])
   @@index([status])
 }
 
-model SubscriptionPlan {
+model ScheduledPayment {
   id                   String   @id @default(cuid())
   subscriptionId       String
   subscription         Subscription @relation(fields: [subscriptionId], references: [id])
   year                 Int
   month                Int
-  targetInstalments    Int
-  completedInstalments Int      @default(0)
-  status               String   @default("active") // active | completed | failed
-  createdAt            DateTime @default(now())
-
-  scheduledPayments ScheduledPayment[]
-
-  @@unique([subscriptionId, year, month])
-  @@index([year, month])
-}
-
-model ScheduledPayment {
-  id                   String   @id @default(cuid())
-  subscriptionPlanId   String
-  subscriptionPlan     SubscriptionPlan @relation(fields: [subscriptionPlanId], references: [id])
   amountCzk            Int
   scheduledAt          DateTime
   status               String   @default("pending") // pending | in_progress | succeeded | failed
@@ -116,7 +100,9 @@ model ScheduledPayment {
 
   transactions Transaction[]
 
+  @@unique([subscriptionId, year, month])
   @@index([scheduledAt, status])
+  @@index([year, month])
 }
 
 model Transaction {

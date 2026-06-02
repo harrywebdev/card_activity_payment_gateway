@@ -52,7 +52,7 @@ export default function PrivacyPage() {
               <td>kvůli účetnictví, držíme 10 let dle zákona</td>
             </tr>
             <tr>
-              <td>Stav splátek</td>
+              <td>Stav předplatného</td>
               <td>kdy jsme co strhli a jestli to prošlo</td>
             </tr>
           </tbody>

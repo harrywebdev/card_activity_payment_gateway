@@ -62,15 +62,15 @@ export type SubProgress = {
   todaySuccess: number;
   todayFailed: number;
   todayAmountCzk: number;
-  completedThisMonth: number;
-  targetThisMonth: number;
+  /** "succeeded" | "pending" | "in_progress" | "failed" | "missing" */
+  thisMonthStatus: string;
 };
 
 export type MonthSubProgress = {
   color: ColorRef;
   username: string;
-  completed: number;
-  target: number;
+  /** "succeeded" | "pending" | "in_progress" | "failed" */
+  status: string;
   amountCzk: number;
 };
 
@@ -80,32 +80,29 @@ export function tplActivation(args: {
   color: ColorRef;
   username: string;
   monthlyAmountCzk: number;
-  instalmentsPerMonth: number;
-  firstAmountCzk: number;
 }): string {
   return [
     `🎨 <b>Nové předplatné</b>`,
     `<b>${esc(args.color.name)}</b> <code>${esc(args.color.hex)}</code> — ${esc(args.username)}`,
-    `${fmtCzk(args.monthlyAmountCzk)} / měsíc v ${args.instalmentsPerMonth} splátkách`,
-    `První splátka ${fmtCzk(args.firstAmountCzk)} proběhla.`,
+    `${fmtCzk(args.monthlyAmountCzk)} / měsíc`,
+    `První platba proběhla.`,
   ].join("\n");
 }
 
-export function tplInstalmentSuccess(args: {
+export function tplChargeSuccess(args: {
   color: ColorRef;
   username: string;
   amountCzk: number;
-  instalmentNumber: number;
-  instalmentsPerMonth: number;
+  /** e.g. "06/2026" */
+  monthLabel: string;
 }): string {
   return (
     `💳 <b>${esc(args.color.name)}</b> <code>${esc(args.color.hex)}</code> — ` +
-    `${esc(args.username)}: ${fmtCzk(args.amountCzk)} · ` +
-    `splátka ${args.instalmentNumber}/${args.instalmentsPerMonth}`
+    `${esc(args.username)}: ${fmtCzk(args.amountCzk)} · ${esc(args.monthLabel)}`
   );
 }
 
-export function tplInstalmentFailure(args: {
+export function tplChargeFailure(args: {
   color: ColorRef;
   username: string;
   amountCzk: number;
@@ -118,6 +115,34 @@ export function tplInstalmentFailure(args: {
     `${fmtCzk(args.amountCzk)} po ${args.attempts} pokusech`,
     `<i>${esc(args.error)}</i>`,
   ].join("\n");
+}
+
+function statusFlag(status: string): string {
+  switch (status) {
+    case "succeeded":
+      return "✅";
+    case "failed":
+      return "🚨";
+    case "missing":
+      return "❓";
+    default:
+      return "⏳"; // pending / in_progress
+  }
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "succeeded":
+      return "stržena";
+    case "failed":
+      return "selhala";
+    case "missing":
+      return "chybí";
+    case "in_progress":
+      return "běží";
+    default:
+      return "čeká";
+  }
 }
 
 export function tplDailySummary(args: {
@@ -135,7 +160,7 @@ export function tplDailySummary(args: {
       `${flag} <b>${esc(s.color.name)}</b> <code>${esc(s.color.hex)}</code> — ` +
       `${esc(s.username)}: dnes ${s.todaySuccess}× (${fmtCzk(s.todayAmountCzk)})` +
       failPart +
-      ` · měsíc ${s.completedThisMonth}/${s.targetThisMonth}`
+      ` · měsíc ${statusLabel(s.thisMonthStatus)}`
     );
   });
 
@@ -154,22 +179,28 @@ export function tplMonthlyRecap(args: {
   if (args.subs.length === 0) return null;
 
   const subLines = args.subs.map((s) => {
-    const hit = s.completed >= s.target;
-    const flag = hit ? "✅" : "⚠️";
-    const note = hit ? "" : " — nesplněn limit";
+    const flag = statusFlag(s.status);
+    const note =
+      s.status === "succeeded"
+        ? ""
+        : s.status === "failed"
+          ? " — platba selhala"
+          : ` — ${statusLabel(s.status)}`;
     return (
       `${flag} <b>${esc(s.color.name)}</b> <code>${esc(s.color.hex)}</code> — ` +
-      `${esc(s.username)}: ${s.completed}/${s.target} (${fmtCzk(s.amountCzk)})${note}`
+      `${esc(s.username)}: ${fmtCzk(s.amountCzk)}${note}`
     );
   });
 
-  const totalTx = args.subs.reduce((a, s) => a + s.completed, 0);
-  const totalAmount = args.subs.reduce((a, s) => a + s.amountCzk, 0);
+  const totalAmount = args.subs
+    .filter((s) => s.status === "succeeded")
+    .reduce((a, s) => a + s.amountCzk, 0);
+  const successCount = args.subs.filter((s) => s.status === "succeeded").length;
 
   const header =
     `🗓 <b>Měsíční rekapitulace</b> — ${esc(fmtMonth(args.monthDate))}\n` +
     `${args.subs.length} ${pl(args.subs.length, ["odstín", "odstíny", "odstínů"])} · ` +
-    `${totalTx}× ${pl(totalTx, ["platba", "platby", "plateb"])} · ` +
+    `${successCount}× ${pl(successCount, ["úspěšná platba", "úspěšné platby", "úspěšných plateb"])} · ` +
     `${fmtCzk(totalAmount)} celkem`;
 
   return `${header}\n\n${subLines.join("\n")}`;
@@ -177,14 +208,14 @@ export function tplMonthlyRecap(args: {
 
 export function tplPlannerError(error: string): string {
   return [
-    `⚠️ <b>Plánovač splátek selhal</b>`,
+    `⚠️ <b>Plánovač plateb selhal</b>`,
     `<i>${esc(error)}</i>`,
     `Příští platby se nemusí naplánovat. Zkontroluj logy.`,
   ].join("\n");
 }
 
 export function tplExecutorError(error: string): string {
-  return [`⚠️ <b>Vykonavatel splátek selhal</b>`, `<i>${esc(error)}</i>`].join(
+  return [`⚠️ <b>Vykonavatel plateb selhal</b>`, `<i>${esc(error)}</i>`].join(
     "\n",
   );
 }

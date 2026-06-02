@@ -66,7 +66,6 @@ describe("POST /api/admin/seed-colors", () => {
         userId: user.id,
         colorId: offCat.id,
         monthlyAmountCzk: 100,
-        instalmentsPerMonth: 10,
         status: "active",
         startedAt: new Date(),
       },

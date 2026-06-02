@@ -6,8 +6,8 @@ import {
   fmtMonth,
   pl,
   tplActivation,
-  tplInstalmentSuccess,
-  tplInstalmentFailure,
+  tplChargeSuccess,
+  tplChargeFailure,
   tplDailySummary,
   tplMonthlyRecap,
   tplPlannerError,
@@ -65,14 +65,12 @@ describe("tplActivation", () => {
       color: { name: "černá", hex: "#000000" },
       username: "karpa",
       monthlyAmountCzk: 100,
-      instalmentsPerMonth: 10,
-      firstAmountCzk: 10,
     });
     expect(msg).toContain("Nové předplatné");
     expect(msg).toContain("<b>černá</b>");
     expect(msg).toContain("<code>#000000</code>");
     expect(msg).toContain("karpa");
-    expect(msg).toContain("v 10 splátkách");
+    expect(msg).toContain("/ měsíc");
   });
 
   it("HTML-escapes a color name containing & or <", () => {
@@ -80,36 +78,33 @@ describe("tplActivation", () => {
       color: { name: "rock & roll", hex: "#000000" },
       username: "karpa",
       monthlyAmountCzk: 100,
-      instalmentsPerMonth: 10,
-      firstAmountCzk: 10,
     });
     expect(msg).toContain("rock &amp; roll");
     expect(msg).not.toContain("rock & roll");
   });
 });
 
-describe("tplInstalmentSuccess", () => {
-  it("renders one-liner with hex, username, amount, and instalment counter", () => {
-    const msg = tplInstalmentSuccess({
+describe("tplChargeSuccess", () => {
+  it("renders one-liner with hex, username, amount, and month label", () => {
+    const msg = tplChargeSuccess({
       color: { name: "modrá", hex: "#0000aa" },
       username: "lumin",
-      amountCzk: 10,
-      instalmentNumber: 3,
-      instalmentsPerMonth: 10,
+      amountCzk: 100,
+      monthLabel: "06/2026",
     });
     expect(msg).toContain("<b>modrá</b>");
     expect(msg).toContain("<code>#0000aa</code>");
     expect(msg).toContain("lumin");
-    expect(msg).toContain("splátka 3/10");
+    expect(msg).toContain("06/2026");
   });
 });
 
-describe("tplInstalmentFailure", () => {
+describe("tplChargeFailure", () => {
   it("renders the failure alert with the error message escaped", () => {
-    const msg = tplInstalmentFailure({
+    const msg = tplChargeFailure({
       color: { name: "modrá", hex: "#0000aa" },
       username: "lumin",
-      amountCzk: 10,
+      amountCzk: 100,
       attempts: 3,
       error: "GoPay 500: <network> error",
     });
@@ -140,9 +135,8 @@ describe("tplDailySummary", () => {
           username: "karpa",
           todaySuccess: 1,
           todayFailed: 0,
-          todayAmountCzk: 10,
-          completedThisMonth: 5,
-          targetThisMonth: 10,
+          todayAmountCzk: 100,
+          thisMonthStatus: "succeeded",
         },
         {
           color: { name: "modrá", hex: "#0000aa" },
@@ -150,8 +144,7 @@ describe("tplDailySummary", () => {
           todaySuccess: 0,
           todayFailed: 1,
           todayAmountCzk: 0,
-          completedThisMonth: 3,
-          targetThisMonth: 10,
+          thisMonthStatus: "pending",
         },
       ],
       totalSuccess: 1,
@@ -161,8 +154,8 @@ describe("tplDailySummary", () => {
     expect(msg).toContain("Denní souhrn");
     expect(msg).toContain("✅");
     expect(msg).toContain("⚠️");
-    expect(msg).toContain("5/10");
-    expect(msg).toContain("3/10");
+    expect(msg).toContain("stržena");
+    expect(msg).toContain("čeká");
     expect(msg).toContain("1× selhalo");
   });
 });
@@ -179,8 +172,7 @@ describe("tplMonthlyRecap", () => {
         subs: Array.from({ length: n }, (_, i) => ({
           color: { name: "černá", hex: "#000000" },
           username: `u${i}`,
-          completed: 10,
-          target: 10,
+          status: "succeeded",
           amountCzk: 100,
         })),
       })!;
@@ -189,40 +181,36 @@ describe("tplMonthlyRecap", () => {
     expect(make(5)).toContain("5 odstínů ·");
   });
 
-  it("marks subscriptions that hit / missed the target", () => {
+  it("marks subscriptions that succeeded / failed", () => {
     const msg = tplMonthlyRecap({
       monthDate: new Date(2026, 4, 1), // květen
       subs: [
         {
           color: { name: "černá", hex: "#000000" },
           username: "karpa",
-          completed: 10,
-          target: 10,
+          status: "succeeded",
           amountCzk: 100,
         },
         {
           color: { name: "modrá", hex: "#0000aa" },
           username: "lumin",
-          completed: 7,
-          target: 10,
-          amountCzk: 70,
+          status: "failed",
+          amountCzk: 0,
         },
       ],
     });
     expect(msg).not.toBeNull();
     expect(msg).toContain("Měsíční rekapitulace");
     expect(msg).toContain("✅");
-    expect(msg).toContain("⚠️");
-    expect(msg).toContain("nesplněn limit");
-    expect(msg).toContain("10/10");
-    expect(msg).toContain("7/10");
+    expect(msg).toContain("🚨");
+    expect(msg).toContain("platba selhala");
   });
 });
 
 describe("tplPlannerError / tplExecutorError", () => {
   it("renders the planner error alert", () => {
     const m = tplPlannerError("foo bar");
-    expect(m).toContain("Plánovač splátek selhal");
+    expect(m).toContain("Plánovač plateb selhal");
     expect(m).toContain("foo bar");
   });
   it("escapes user-provided error text", () => {

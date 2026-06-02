@@ -36,31 +36,22 @@ async function setupSubAndDuePayment(opts?: {
       colorId: color.id,
       paymentMethodId: pm.id,
       monthlyAmountCzk: 100,
-      instalmentsPerMonth: 10,
       status: "active",
       startedAt: new Date(),
     },
   });
-  const plan = await prisma.subscriptionPlan.create({
+  const sp = await prisma.scheduledPayment.create({
     data: {
       subscriptionId: sub.id,
       year: 2026,
       month: 6,
-      targetInstalments: 10,
-      completedInstalments: 1,
-      status: "active",
-    },
-  });
-  const sp = await prisma.scheduledPayment.create({
-    data: {
-      subscriptionPlanId: plan.id,
-      amountCzk: opts?.amountCzk ?? 10,
+      amountCzk: opts?.amountCzk ?? 100,
       scheduledAt: opts?.scheduledAt ?? new Date(Date.now() - 60_000),
       status: "pending",
       attempts: opts?.attempts ?? 0,
     },
   });
-  return { sub, plan, sp };
+  return { sub, sp };
 }
 
 describe("POST /api/cron/execute-due", () => {
@@ -72,7 +63,7 @@ describe("POST /api/cron/execute-due", () => {
   });
 
   it("charges a due payment successfully (DRY_RUN GoPay returns PAID)", async () => {
-    const { sp, plan } = await setupSubAndDuePayment();
+    const { sp } = await setupSubAndDuePayment();
     const r = await POST(authedRequest());
     const body = await r.json();
     expect(body.processed).toBe(1);
@@ -89,11 +80,6 @@ describe("POST /api/cron/execute-due", () => {
     });
     expect(tx!.status).toBe("succeeded");
     expect(tx!.gopayPaymentId).toBeTruthy();
-
-    const updatedPlan = await prisma.subscriptionPlan.findUnique({
-      where: { id: plan.id },
-    });
-    expect(updatedPlan!.completedInstalments).toBe(2); // was 1, +1
   });
 
   it("skips not-yet-due payments", async () => {

@@ -39,7 +39,6 @@ beforeEach(async () => {
   // Order matters because of FK constraints.
   await prisma.transaction.deleteMany({});
   await prisma.scheduledPayment.deleteMany({});
-  await prisma.subscriptionPlan.deleteMany({});
   await prisma.color.updateMany({ data: { currentSubscriptionId: null } });
   await prisma.subscription.deleteMany({});
   await prisma.paymentMethod.deleteMany({});

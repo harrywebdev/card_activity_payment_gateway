@@ -184,11 +184,11 @@ export default async function Home() {
           </div>
           <div>
             <div className="tag">02</div>
-            <h3 className="h3">Splátky podle tebe.</h3>
+            <h3 className="h3">Cena podle tebe.</h3>
             <p style={{ fontSize: 15, color: "var(--c0)", margin: 0 }}>
-              Ty určíš <b style={{ color: "var(--c4)" }}>cenu</b>. Ty určíš{" "}
-              <b style={{ color: "var(--c4)" }}>kolik měsíců</b>. Strhává se to
-              vždy prvního v měsíci. Nic víc, nic míň.
+              Ty určíš <b style={{ color: "var(--c4)" }}>cenu</b>. Strhává se
+              to <b style={{ color: "var(--c4)" }}>jednou měsíčně</b>. Nic víc,
+              nic míň.
             </p>
           </div>
           <div>

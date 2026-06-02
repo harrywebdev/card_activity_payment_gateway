@@ -1,15 +1,15 @@
 # Kup si Odstín
 
-`kupsiodstin.cz` — a 16-colour subscription storefront. Pick one of the IBM CGA shades from 1981, set what you want to pay per month and over how many instalments, and the colour is yours on the catalogue until you stop paying. One owner per colour at a time.
+`kupsiodstin.cz` — a 16-colour subscription storefront. Pick one of the IBM CGA shades from 1981, set how much you want to pay each month, and the colour is yours on the catalogue until you cancel. One owner per colour at a time.
 
 ## How it works
 
 1. **Sign in with a magic link** (allowlisted emails only). On first sign-in you're assigned a unique 5-letter username (e.g. `karpa`) — that's your public identity on colour owner pages.
 2. **Pick a free colour** from the 16-colour CGA palette. Each colour has one owner at a time.
-3. **Set the terms** — pick `monthlyAmountCzk` (what you want to pay each month) and `instalmentsPerMonth` (how many separate charges to split it into; each instalment must be at least 1 CZK).
+3. **Set the price** — pick `monthlyAmountCzk` (what you want to pay each month, between 1 CZK and 100 000 CZK). One charge per month.
 4. **First payment goes through GoPay's hosted page.** Card details stay with GoPay; we never see them.
-5. **The rest of the month runs unattended.** Disco's scheduler triggers our executor every 10 minutes, which charges saved card tokens for any instalments that are due.
-6. **Telegram notifications** for per-instalment confirmations, daily progress digests, monthly recaps, and error alerts.
+5. **Subsequent months run unattended.** On the 1st of each month the planner schedules a single charge per active subscription (at a random time inside a 2nd–27th window); Disco's executor cron picks it up and bills the saved card token via GoPay's ON_DEMAND recurrence. Cancel anytime.
+6. **Telegram notifications** for activation, monthly charge confirmations, daily digests, monthly recaps, and error alerts.
 
 ## Why GoPay
 
@@ -22,6 +22,8 @@ For micro-transactions in CZK:
 | **GoPay** | **0.95% + 0 CZK** | **80 CZK**  | **0.19 CZK (0.95%)**    |
 
 GoPay wins: no fixed per-transaction fee (critical for small amounts), lowest percentage rate, ON_DEMAND recurring payment support, 12 months free on the Start plan.
+
+GoPay's recurring rules forbid framing charges as instalments of a finite total — the model is a single recurring monthly charge the customer can cancel at any time. The schema and copy reflect that.
 
 ## Tech Stack
 

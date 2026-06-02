@@ -19,7 +19,6 @@ async function createActiveSub(hex = "#000000") {
       userId: user.id,
       colorId: color.id,
       monthlyAmountCzk: 100,
-      instalmentsPerMonth: 10,
       status: "active",
       startedAt: new Date(),
     },
