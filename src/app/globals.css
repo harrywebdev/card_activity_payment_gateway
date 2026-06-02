@@ -773,3 +773,51 @@ input[type="range"]::-moz-range-thumb {
   border: 2px outset var(--c15);
   border-radius: 0;
 }
+
+/* ── Mobile responsiveness ───────────────────────────────────────────────
+   Tight viewports (<640px): hide chrome that doesn't belong on touch
+   (F-key hints, win-title fake buttons), stack the menu bar onto multiple
+   rows, and shrink padding. Kept at the bottom of the file so subsequent
+   base rules can't override these overrides. */
+
+@media (max-width: 640px) {
+  .hide-mobile {
+    display: none !important;
+  }
+  .menubar {
+    padding: 2px;
+    font-size: 13px;
+    flex-wrap: wrap;
+    white-space: normal;
+    line-height: 26px;
+  }
+  .menubar-brand {
+    padding: 0 8px 0 4px;
+  }
+  .menubar-item {
+    padding: 0 8px;
+  }
+  .menubar-spacer {
+    flex-basis: auto;
+  }
+  .statusbar {
+    padding: 0 6px;
+    gap: 10px;
+    font-size: 12px;
+    overflow-x: hidden;
+  }
+  .win-title .btns {
+    display: none;
+  }
+  .desk-scroll {
+    padding: 14px 12px 24px;
+  }
+  .win-body {
+    padding: 14px 14px 18px;
+  }
+}
+@media (max-width: 520px) {
+  .swatches {
+    grid-template-columns: 1fr;
+  }
+}

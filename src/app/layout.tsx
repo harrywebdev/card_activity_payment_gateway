@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { MenuBar } from "@/components/menu-bar";
 import { StatusBar } from "@/components/status-bar";
 import "./globals.css";
@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: "Kup si Odstín — vlastni jednu barvu",
   description:
     "Vyber si jeden ze 16 odstínů z CGA palety a vlastni ho. Měsíční předplatné, zrušitelné kdykoliv.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
