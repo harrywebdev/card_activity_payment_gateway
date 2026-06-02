@@ -37,9 +37,11 @@ export default function TermsPage() {
           <section>
             <h3 className="h3">1. Co je „vlastnictví barvy"</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Je to <b>záznam v naší databázi</b>, který říká, že daný uživatel
-              drží daný odstín. Není to autorské právo, není to ochranná známka,
-              není to NFT. Je to evidence pro účely téhle hry.
+              Je to <b>záznam v naší databázi na kupsiodstin.cz</b>, který
+              říká, že daný uživatel drží daný odstín tady na webu. Není to
+              autorské právo, není to ochranná známka, není to NFT, žádný
+              právní nárok k barvě mimo tenhle web. Je to evidence pro účely
+              téhle hry.
             </p>
           </section>
           <section>

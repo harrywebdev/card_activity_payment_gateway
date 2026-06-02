@@ -250,7 +250,7 @@ export default async function ColorDetail({
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
               Nic. <b>To je celá pointa.</b>
               <br />
-              Bude tvoje. Ostatní 15 majitelů to bude vědět.
+              Bude tvoje tady na webu. Ostatních 15 majitelů to bude vědět.
               <br />
               Můžeš si dát URL{" "}
               <span className="kbd">

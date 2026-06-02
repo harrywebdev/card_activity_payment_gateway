@@ -36,8 +36,10 @@ export default function RecurringPage() {
           <section>
             <h3 className="h3">Důvod opakované platby</h3>
             <p style={{ fontSize: 15, color: "var(--c0)" }}>
-              Předplatné vlastnictví jednoho ze 16 odstínů CGA palety. Dokud
-              platíš, odstín je tvůj.
+              Předplatné záznamu vlastnictví jednoho ze 16 odstínů CGA palety
+              na webu kupsiodstin.cz. Dokud platíš, je u odstínu v našem
+              katalogu uvedená tvoje přezdívka. Nejde o autorské právo,
+              ochrannou známku ani jiný právní nárok k barvě jako takové.
             </p>
           </section>
 

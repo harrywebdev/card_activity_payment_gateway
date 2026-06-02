@@ -37,7 +37,7 @@ export default async function Home() {
               <br />
               co měl tvůj táta na 386ce na CGA monitoru.
               <br />
-              Vyber si jednu — a je tvoje, dokud platíš.
+              Vyber si jednu — a je tvoje tady na webu, dokud platíš.
             </p>
             <div className="row" style={{ marginTop: 18 }}>
               <Link className="btn btn-primary" href="/colors">
